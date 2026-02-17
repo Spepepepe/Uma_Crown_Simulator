@@ -1,0 +1,346 @@
+# Uma Crown Simulator
+
+ウマ娘の全冠達成を支援するWebアプリケーションです。
+
+## リプレイス履歴
+
+本プロジェクトは以下の技術スタックを経てリプレイスされてきました。
+
+| 世代 | フロントエンド | バックエンド | 備考 |
+|------|---------------|-------------|------|
+| 第1世代 | Blade (Laravel 9.19) | PHP (Laravel 9.19) | モノリシック構成 |
+| 第2世代 | React | PHP (Laravel 11.31) | フロント・バック分離 |
+| 第3世代 | TypeScript (Next.js) | Python (Django REST Framework) | フルリプレイス |
+| **第4世代 (現行)** | **Angular + Tailwind CSS** | **NestJS + Prisma** | **モノレポ構成** |
+
+## 技術スタック
+
+### フロントエンド
+- **Framework**: Angular 21
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS v4
+- **Build**: esbuild (`@angular/build:application`)
+
+### バックエンド
+- **Framework**: NestJS
+- **Language**: TypeScript
+- **ORM**: Prisma
+- **Database**: PostgreSQL 16
+- **Authentication**: Amazon Cognito (JWT)
+
+### インフラ
+- **パッケージ管理**: npm workspaces (モノレポ)
+- **共有型定義**: `shared/` パッケージ
+- **コンテナ**: Docker / Docker Compose
+- **オーケストレーション**: Kubernetes (Docker Desktop)
+
+## アーキテクチャ
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     Client (Browser)                    │
+└──────────────────────────┬──────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────┐
+│              Frontend (nginx / Angular)                 │
+│  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐  │
+│  │  AuthGuard   │  │  HttpClient  │  │   Cognito SDK │  │
+│  │  (Router)    │  │ (Interceptor)│  │  (SignIn/Up)  │  │
+│  └─────────────┘  └──────┬───────┘  └───────────────┘  │
+└──────────────────────────┼──────────────────────────────┘
+                  /api/*   │  nginx reverse proxy
+┌──────────────────────────▼──────────────────────────────┐
+│               Backend (NestJS)                          │
+│  ┌──────────┐  ┌───────────┐  ┌──────────────────────┐  │
+│  │AuthGuard │  │ Cognito   │  │  Feature Modules     │  │
+│  │(Global)  │──│ Verifier  │  │  ┌────────────────┐  │  │
+│  └──────────┘  └───────────┘  │  │  Umamusume     │  │  │
+│                               │  │  Race           │  │  │
+│                               │  │  RacePattern    │  │  │
+│                               │  │  BreedingCount  │  │  │
+│                               │  └────────────────┘  │  │
+│                               └──────────┬───────────┘  │
+│                                          │ Prisma ORM   │
+└──────────────────────────────────────────┼──────────────┘
+┌──────────────────────────────────────────▼──────────────┐
+│                   PostgreSQL 16                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+フロントエンドとバックエンドで TypeScript + `@shared/types` を共有し、API の型安全性を担保しています。認証は Amazon Cognito に委譲し、バックエンドでは JWT トークンの検証のみを行うステートレスな構成です。
+
+## プロジェクト構成
+
+```
+Uma_Crown_Simulator/
+├── frontend/                        # Angular フロントエンド
+│   ├── src/app/
+│   │   ├── core/                    # アプリケーション基盤
+│   │   │   ├── guards/
+│   │   │   │   └── auth.guard.ts    # 認証ルートガード (CanActivateFn)
+│   │   │   ├── interceptors/
+│   │   │   │   └── auth.interceptor.ts  # JWT Bearer トークン自動付与
+│   │   │   └── services/
+│   │   │       └── auth.service.ts  # Cognito 認証 (Signal ベース状態管理)
+│   │   ├── features/                # 機能モジュール (遅延読み込み)
+│   │   │   ├── auth/
+│   │   │   │   ├── login/           # ログイン画面
+│   │   │   │   └── register/        # ユーザー登録画面
+│   │   │   ├── character-regist/    # ウマ娘登録 (未登録一覧 + レース選択)
+│   │   │   ├── character-list/      # 登録済みウマ娘一覧 (適性表示)
+│   │   │   ├── race-list/           # レース一覧 (馬場・距離フィルタ)
+│   │   │   └── remaining-race/      # 残レース管理
+│   │   │       ├── remaining-race-list.ts     # 残レース一覧 (全ウマ娘)
+│   │   │       ├── remaining-race-pattern.ts  # 育成パターン提案
+│   │   │       └── remaining-race-manual.ts   # 手動レース登録
+│   │   ├── shared/components/       # 共有UIコンポーネント
+│   │   │   ├── sidebar/             # ナビゲーションサイドバー
+│   │   │   ├── aptitude-badge/      # 適性ランクバッジ (S~G)
+│   │   │   └── toast/               # トースト通知
+│   │   ├── environments/            # 環境別設定 (dev / prod)
+│   │   ├── app.routes.ts            # ルーティング定義 (遅延読み込み)
+│   │   ├── app.ts                   # ルートコンポーネント
+│   │   └── app.config.ts            # DI / Interceptor 設定
+│   ├── public/                      # 静的アセット (favicon 等)
+│   ├── nginx.conf                   # 本番用リバースプロキシ設定
+│   ├── Dockerfile                   # 開発用コンテナ
+│   └── Dockerfile.prod              # 本番用マルチステージビルド
+│
+├── backend/                         # NestJS バックエンド
+│   ├── src/
+│   │   ├── common/                  # 横断的関心事
+│   │   │   ├── cognito/             # Cognito JWT 検証サービス
+│   │   │   ├── guards/              # グローバル認証ガード
+│   │   │   ├── decorators/          # @CurrentUser(), @Public()
+│   │   │   └── prisma/              # Prisma クライアント (グローバルモジュール)
+│   │   ├── auth/                    # 認証エンドポイント
+│   │   ├── umamusume/               # ウマ娘 CRUD
+│   │   │   ├── umamusume.controller.ts  # GET/POST エンドポイント
+│   │   │   └── umamusume.service.ts     # 登録・検索ロジック
+│   │   ├── race/                    # レース管理
+│   │   │   ├── race.controller.ts       # レース API エンドポイント
+│   │   │   ├── race.service.ts          # レース検索・残レース集計
+│   │   │   ├── race-pattern.service.ts  # 育成パターン生成アルゴリズム
+│   │   │   └── breeding-count.service.ts # 必要育成回数の算出
+│   │   ├── health/                  # ヘルスチェック (k8s Probe 用)
+│   │   ├── seed/                    # 初期データ投入
+│   │   └── main.ts                  # アプリケーションエントリポイント
+│   ├── prisma/
+│   │   └── schema.prisma            # データベーススキーマ定義
+│   ├── data/                        # シードデータ (JSON)
+│   └── Dockerfile                   # バックエンドコンテナ
+│
+├── shared/                          # 共有パッケージ (@uma-crown/shared)
+│   ├── types/
+│   │   └── index.ts                 # フロント・バック共通の型定義
+│   └── package.json
+│
+├── k8s/                             # Kubernetes マニフェスト
+│   ├── namespace.yaml               # uma-crown 名前空間
+│   ├── postgres-deployment.yaml     # PostgreSQL (PVC + Recreate 戦略)
+│   ├── backend-deployment.yaml      # Backend (ClusterIP)
+│   ├── frontend-deployment.yaml     # Frontend (NodePort 30080)
+│   ├── configmap.yaml               # 非機密設定値
+│   ├── secret.yaml                  # 機密情報 (DB / Cognito)
+│   ├── ingress.yaml                 # Ingress ルーティング
+│   ├── deploy.sh                    # デプロイスクリプト
+│   └── teardown.sh                  # リソース削除スクリプト
+│
+├── docker-compose.yml               # 開発環境オーケストレーション
+├── .env.example                     # 環境変数テンプレート
+└── package.json                     # npm workspaces ルート定義
+```
+
+### モジュール詳細
+
+#### `shared/` - 共有型定義パッケージ
+
+npm workspaces で `@uma-crown/shared` として公開。フロントエンド・バックエンド間で共通のインターフェースを定義し、API の入出力に対する型安全性を保証します。
+
+主な型: `Umamusume`, `Race`, `RemainingRace`, `RacePattern`, `RaceSlot`, `LoginRequest`, `AuthResponse` 等
+
+#### `frontend/src/app/core/` - アプリケーション基盤層
+
+認証に関する横断的関心事を集約。`AuthService` は Angular Signals でトークン状態をリアクティブに管理し、`HttpInterceptor` が全リクエストに Bearer トークンを自動付与します。`AuthGuard` は未認証ユーザーをログイン画面にリダイレクトします。
+
+#### `frontend/src/app/features/` - 機能モジュール群
+
+各機能は Angular の遅延読み込み (Lazy Loading) で分割され、初期バンドルサイズを最適化しています。
+
+| モジュール | 概要 |
+|-----------|------|
+| `auth/` | Cognito ベースのログイン・ユーザー登録 |
+| `character-regist/` | 未登録ウマ娘の選択と初期レース完了状態の一括登録 |
+| `character-list/` | 登録済みウマ娘の一覧と適性情報のビジュアル表示 |
+| `race-list/` | 全レース一覧 (馬場・距離フィルタ付き、未認証でもアクセス可) |
+| `remaining-race/` | 全冠達成に向けた残レース管理・育成パターン提案・手動レース登録 |
+
+#### `backend/src/common/` - 横断的関心事
+
+NestJS のモジュールシステムを活用し、認証・DB アクセスなどの共通機能をグローバルモジュールとして提供。`@Public()` デコレータで個別エンドポイントの認証スキップを宣言的に制御します。
+
+#### `backend/src/race/` - レース管理モジュール
+
+本アプリケーションのコアロジック。`RacePatternService` は、ウマ娘の適性・シナリオ制約・レーススケジュールの競合を考慮した組合せ最適化アルゴリズムにより、全冠達成に向けた複数の育成ローテーションパターン (ラーク / メイクラ / 伝説) を生成します。`BreedingCountService` は残レース数と適性から必要育成回数を算出します。
+
+#### `k8s/` - Kubernetes マニフェスト
+
+各サービスを独立した Pod として管理。PostgreSQL は `Recreate` 戦略と PersistentVolumeClaim でデータ永続性を確保。フロントエンドの nginx が `/api/` パスをバックエンドにリバースプロキシし、CORS 不要な統一オリジン構成を実現しています。
+
+## 主要機能
+
+- **ウマ娘管理**: 所持ウマ娘の登録・一覧表示、適性情報の可視化
+- **レース情報**: G1/G2/G3レース一覧、馬場・距離による絞り込み
+- **残レース表示**: 全冠達成に必要な残りレースをウマ娘ごとに集計・表示
+- **育成パターン提案**: 適性・シナリオ制約を考慮した最適な育成ローテーションを複数パターン自動生成
+- **認証**: Amazon Cognito によるユーザー認証・セッション管理
+
+## API エンドポイント
+
+### 認証 (`/api/v1/auth/`)
+| Method | Path | 認証 | 概要 |
+|--------|------|------|------|
+| POST | `/auth/login` | 不要 | ログイン |
+| POST | `/auth/signup` | 不要 | ユーザー登録 |
+
+### ウマ娘 (`/api/v1/umamusumes/`)
+| Method | Path | 認証 | 概要 |
+|--------|------|------|------|
+| GET | `/umamusumes` | 必要 | 全ウマ娘一覧 |
+| GET | `/umamusumes/unregistered` | 必要 | 未登録ウマ娘一覧 |
+| GET | `/umamusumes/registered` | 必要 | 登録済みウマ娘一覧 |
+| POST | `/umamusumes/registrations` | 必要 | ウマ娘登録 + 初期レース登録 |
+
+### レース (`/api/v1/races/`)
+| Method | Path | 認証 | 概要 |
+|--------|------|------|------|
+| GET | `/races` | 不要 | レース一覧 (フィルタ対応) |
+| GET | `/races/registration-targets` | 必要 | 登録用レース一覧 |
+| GET | `/races/remaining` | 必要 | 全ウマ娘の残レース集計 |
+| GET | `/races/remaining/:id/:season/:month/:half` | 必要 | 月別残レース取得 |
+| POST | `/races/run` | 必要 | レース出走登録 |
+| POST | `/races/pattern/:id` | 必要 | パターン一括登録 |
+
+### ヘルスチェック
+| Method | Path | 認証 | 概要 |
+|--------|------|------|------|
+| GET | `/health` | 不要 | k8s Probe 用ヘルスチェック |
+
+## 環境構成
+
+開発環境と本番環境は分離されています。
+
+### 開発環境 (Docker Compose)
+
+Docker Desktop の Kubernetes を使用してローカルにデプロイします。
+
+```bash
+# デプロイ
+cd k8s
+bash deploy.sh
+
+# 削除
+bash teardown.sh
+```
+
+| サービス | アクセス | 備考 |
+|---------|---------|------|
+| Frontend | NodePort 30080 | nginx で静的ファイル配信 + API プロキシ |
+| Backend | ClusterIP | フロントエンドの nginx 経由でアクセス |
+| PostgreSQL | ClusterIP | クラスタ内部のみ |
+
+フロントエンドの nginx が `/api/` へのリクエストをバックエンドにプロキシするため、フロントエンドは相対パス `/api/v1` でAPIにアクセスします。
+
+## 環境変数
+
+`.env.example` を参考に `.env` ファイルを作成してください。
+
+```env
+# PostgreSQL
+DATABASE_URL=postgresql://user:password@localhost:5432/uma_crown
+POSTGRES_USER=uma_crown
+POSTGRES_PASSWORD=uma_crown_dev
+POSTGRES_DB=uma_crown
+
+# AWS Cognito
+COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
+COGNITO_CLIENT_ID=your-client-id
+COGNITO_REGION=us-east-1
+
+# CORS
+CORS_ORIGIN=http://localhost:4200
+
+# Node
+NODE_ENV=development
+```
+
+## データベース
+
+### マイグレーション
+
+```bash
+# Prisma マイグレーション実行
+npm run -w backend prisma:migrate
+
+# Prisma Client 生成
+npm run -w backend prisma:generate
+```
+
+### ER図
+
+```mermaid
+erDiagram
+    UmamusumeTable ||--o{ RegistUmamusumeTable : "1:N"
+    UmamusumeTable ||--o{ RegistUmamusumeRaceTable : "1:N"
+    UmamusumeTable ||--o{ ScenarioRaceTable : "1:N"
+    RaceTable ||--o{ RegistUmamusumeRaceTable : "1:N"
+    RaceTable ||--o{ ScenarioRaceTable : "1:N"
+
+    UmamusumeTable {
+        int umamusume_id PK
+        string umamusume_name
+        string turf_aptitude
+        string dirt_aptitude
+        string sprint_aptitude
+        string mile_aptitude
+        string classic_aptitude
+        string long_distance_aptitude
+    }
+
+    RaceTable {
+        int race_id PK
+        string race_name
+        int race_state
+        int distance
+        int distance_detail
+        int num_fans
+        int race_months
+        int half_flag
+        int race_rank
+        int junior_flag
+        int classic_flag
+        int senior_flag
+    }
+
+    RegistUmamusumeTable {
+        string user_id FK
+        int umamusume_id FK
+        datetime regist_date
+        bigint fans
+    }
+
+    RegistUmamusumeRaceTable {
+        string user_id FK
+        int umamusume_id FK
+        int race_id FK
+        datetime regist_date
+    }
+
+    ScenarioRaceTable {
+        int umamusume_id FK
+        int race_id FK
+        int race_number
+        int random_group
+        int senior_flag
+    }
+```
