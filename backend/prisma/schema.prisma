@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model UmamusumeTable {
+  umamusume_id           Int    @id @default(autoincrement())
+  umamusume_name         String @db.VarChar(255)
+  turf_aptitude          String @db.Char(1)
+  dirt_aptitude          String @db.Char(1)
+  front_runner_aptitude  String @db.Char(1)
+  early_foot_aptitude    String @db.Char(1)
+  midfield_aptitude      String @db.Char(1)
+  closer_aptitude        String @db.Char(1)
+  sprint_aptitude        String @db.Char(1)
+  mile_aptitude          String @db.Char(1)
+  classic_aptitude       String @db.Char(1)
+  long_distance_aptitude String @db.Char(1)
+
+  scenarioRaces        ScenarioRaceTable[]
+  registUmamusumes     RegistUmamusumeTable[]
+  registUmamusumeRaces RegistUmamusumeRaceTable[]
+
+  @@map("umamusume_table")
+}
+
+model RaceTable {
+  race_id       Int    @id @default(autoincrement())
+  race_name     String @db.VarChar(255)
+  race_state    Int
+  distance      Int
+  distance_detail Int? @db.SmallInt
+  num_fans      Int    @default(0)
+  race_months   Int
+  half_flag     Boolean
+  race_rank     Int
+  junior_flag   Boolean
+  classic_flag  Boolean
+  senior_flag   Boolean
+  scenario_flag Boolean @default(false)
+
+  scenarioRaces        ScenarioRaceTable[]
+  registUmamusumeRaces RegistUmamusumeRaceTable[]
+
+  @@index([race_rank], map: "idx_race_rank")
+  @@map("race_table")
+}
+
+model ScenarioRaceTable {
+  id           Int  @id @default(autoincrement())
+  umamusume_id Int
+  race_id      Int
+  race_number  Int
+  random_group Int?
+  senior_flag  Boolean?
+
+  umamusume UmamusumeTable @relation(fields: [umamusume_id], references: [umamusume_id], onDelete: Cascade)
+  race      RaceTable      @relation(fields: [race_id], references: [race_id], onDelete: Cascade)
+
+  @@unique([umamusume_id, race_id, race_number])
+  @@index([umamusume_id], map: "idx_scenario_race_umamusume")
+  @@map("scenario_race_table")
+}
+
+model RegistUmamusumeTable {
+  id           Int      @id @default(autoincrement())
+  user_id      String   @db.Uuid
+  umamusume_id Int
+  regist_date  DateTime @default(now()) @db.Timestamptz()
+
+  umamusume UmamusumeTable @relation(fields: [umamusume_id], references: [umamusume_id], onDelete: Cascade)
+
+  @@unique([user_id, umamusume_id])
+  @@index([user_id], map: "idx_regist_umamusume_user")
+  @@map("regist_umamusume_table")
+}
+
+model RegistUmamusumeRaceTable {
+  id           Int      @id @default(autoincrement())
+  user_id      String   @db.Uuid
+  umamusume_id Int
+  race_id      Int
+  regist_date  DateTime @default(now()) @db.Timestamptz()
+
+  umamusume UmamusumeTable @relation(fields: [umamusume_id], references: [umamusume_id], onDelete: Cascade)
+  race      RaceTable      @relation(fields: [race_id], references: [race_id], onDelete: Cascade)
+
+  @@unique([user_id, umamusume_id, race_id])
+  @@index([user_id], map: "idx_regist_umamusume_race_user")
+  @@index([umamusume_id], map: "idx_regist_umamusume_race_umamusume")
+  @@map("regist_umamusume_race_table")
+}
