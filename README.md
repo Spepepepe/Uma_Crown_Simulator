@@ -100,6 +100,7 @@ Uma_Crown_Simulator/
 │   │   ├── app.routes.ts            # ルーティング定義 (遅延読み込み)
 │   │   ├── app.ts                   # ルートコンポーネント
 │   │   └── app.config.ts            # DI / Interceptor 設定
+│   ├── test/unit/                   # Vitest 単体テスト (src/ 構造をミラー)
 │   ├── public/                      # 静的アセット (favicon 等)
 │   ├── nginx.conf                   # 本番用リバースプロキシ設定
 │   ├── Dockerfile                   # 開発用コンテナ
@@ -124,6 +125,9 @@ Uma_Crown_Simulator/
 │   │   ├── health/                  # ヘルスチェック (k8s Probe 用)
 │   │   ├── seed/                    # 初期データ投入
 │   │   └── main.ts                  # アプリケーションエントリポイント
+│   ├── test/
+│   │   ├── unit/                    # Jest 単体テスト (src/ 構造をミラー)
+│   │   └── e2e/                     # Jest + Supertest E2E テスト
 │   ├── prisma/
 │   │   └── schema.prisma            # データベーススキーマ定義
 │   ├── data/                        # シードデータ (JSON)
@@ -342,4 +346,73 @@ erDiagram
         int random_group
         int senior_flag
     }
+```
+
+## テスト
+
+### テスト構成
+
+テストは各パッケージの `test/` ディレクトリに配置し、`src/` の構造をミラーリングしています。
+外部サービス（Cognito・PostgreSQL）はすべてモック化するため、**Kubernetes や DB 不要でローカル単体実行**できます。
+
+```
+backend/
+└── test/
+    ├── unit/                          # Jest 単体テスト
+    │   ├── auth/
+    │   │   └── auth.service.spec.ts   # AuthService
+    │   ├── common/guards/
+    │   │   └── auth.guard.spec.ts     # AuthGuard (JWT 検証)
+    │   ├── race/
+    │   │   ├── breeding-count.service.spec.ts
+    │   │   ├── race.service.spec.ts
+    │   │   └── race-pattern.service.spec.ts
+    │   └── umamusume/
+    │       └── umamusume.service.spec.ts
+    └── e2e/                           # Jest + Supertest E2E テスト
+        ├── race.e2e-spec.ts
+        └── umamusume.e2e-spec.ts
+
+frontend/
+└── test/
+    └── unit/                          # Vitest 単体テスト
+        ├── core/
+        │   ├── guards/
+        │   │   └── auth.guard.spec.ts
+        │   ├── interceptors/
+        │   │   └── auth.interceptor.spec.ts
+        │   └── services/
+        │       └── auth.service.spec.ts
+        └── shared/components/toast/
+            └── toast.service.spec.ts
+```
+
+### テスト技術スタック
+
+| 対象 | フレームワーク | モック |
+|------|--------------|--------|
+| バックエンド 単体 | Jest + ts-jest | PrismaService・Cognito を手動モック |
+| バックエンド E2E | Jest + Supertest | NestJS TestingModule + MockAuthGuard |
+| フロントエンド 単体 | Vitest (`@angular/build:unit-test`) | Angular TestBed + `vi.mock()` |
+
+### 実行方法
+
+#### バックエンド
+
+```bash
+# 単体テスト
+npm run -w backend test
+
+# E2E テスト
+npm run -w backend test:e2e
+```
+
+#### フロントエンド
+
+```bash
+# 単体テスト（ウォッチモード・デフォルト）
+npm run -w frontend test
+
+# 1回実行して終了（CI 向け）
+cd frontend && npx ng test --watch=false
 ```

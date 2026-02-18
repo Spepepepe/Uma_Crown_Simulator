@@ -2,7 +2,8 @@
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
   "cli": {
-    "packageManager": "npm"
+    "packageManager": "npm",
+    "analytics": "07ee61f8-b25e-4fc6-ab6a-a643e4a8e0dc"
   },
   "newProjectRoot": "projects",
   "projects": {
@@ -71,7 +72,12 @@
           "defaultConfiguration": "development"
         },
         "test": {
-          "builder": "@angular/build:unit-test"
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "include": [
+              "../test/unit/**/*.spec.ts"
+            ]
+          }
         }
       }
     }
