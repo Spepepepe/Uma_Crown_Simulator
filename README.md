@@ -13,6 +13,28 @@
 | 第3世代 | TypeScript (Next.js) | Python (Django REST Framework) | フルリプレイス |
 | **第4世代 (現行)** | **Angular + Tailwind CSS** | **NestJS + Prisma** | **モノレポ構成** |
 
+## 技術選定の理由
+
+### 第1世代 — PHP (Laravel) モノリシック
+
+業務で Laravel を使用しており、そのスキルを活かせば「自分が作りたいシステム」を実現できると判断。まず動くものを作ることを優先した。
+
+### 第2世代 — React + Laravel (API)
+
+フロントエンドに React を使ってみたいという動機から、バックエンドを REST API として切り出す構成に移行。SPA + API というアーキテクチャを経験することが目的だった。
+
+### 第3世代 — Next.js + Python (Django REST Framework)
+
+マイクロサービス的なフロント・バック分離を突き詰め、バックエンドを Python で試験的に再構築。フロントは React の延長として Next.js を採用し、バックエンドは別言語を経験することでアーキテクチャへの理解を深めた。
+
+### 第4世代（現行）— Angular + NestJS (TypeScript モノレポ)
+
+実サービスとしての運用を見据え、以下の理由で現在の構成を選定。
+
+- **TypeScript で統一**: フロント・バック間で型定義を共有し、API の型安全性を担保するため両方を TypeScript に統一
+- **NestJS**: レースパターン計算など処理速度が求められる機能において Node.js の JIT が有効に働くこと、モジュール単位の責務分散と DI により大規模化に耐える設計ができることから採用
+- **Angular**: Next.js で肥大化していたフロントエンドを再設計するにあたり、NestJS と同様にモジュール・DI による責務分散が標準で備わっている Angular を採用。フレームワークとしての一貫性がチーム開発・保守性に寄与すると判断
+
 ## 技術スタック
 
 ### フロントエンド
@@ -277,6 +299,75 @@ CORS_ORIGIN=http://localhost:4200
 NODE_ENV=development
 ```
 
+## テスト
+
+### テスト構成
+
+テストは各パッケージの `test/` ディレクトリに配置し、`src/` の構造をミラーリングしています。
+外部サービス（Cognito・PostgreSQL）はすべてモック化するため、**Kubernetes や DB 不要でローカル単体実行**できます。
+
+```
+backend/
+└── test/
+    ├── unit/                          # Jest 単体テスト
+    │   ├── auth/
+    │   │   └── auth.service.spec.ts   # AuthService
+    │   ├── common/guards/
+    │   │   └── auth.guard.spec.ts     # AuthGuard (JWT 検証)
+    │   ├── race/
+    │   │   ├── breeding-count.service.spec.ts
+    │   │   ├── race.service.spec.ts
+    │   │   └── race-pattern.service.spec.ts
+    │   └── umamusume/
+    │       └── umamusume.service.spec.ts
+    └── e2e/                           # Jest + Supertest E2E テスト
+        ├── race.e2e-spec.ts
+        └── umamusume.e2e-spec.ts
+
+frontend/
+└── test/
+    └── unit/                          # Vitest 単体テスト
+        ├── core/
+        │   ├── guards/
+        │   │   └── auth.guard.spec.ts
+        │   ├── interceptors/
+        │   │   └── auth.interceptor.spec.ts
+        │   └── services/
+        │       └── auth.service.spec.ts
+        └── shared/components/toast/
+            └── toast.service.spec.ts
+```
+
+### テスト技術スタック
+
+| 対象 | フレームワーク | モック |
+|------|--------------|--------|
+| バックエンド 単体 | Jest + ts-jest | PrismaService・Cognito を手動モック |
+| バックエンド E2E | Jest + Supertest | NestJS TestingModule + MockAuthGuard |
+| フロントエンド 単体 | Vitest (`@angular/build:unit-test`) | Angular TestBed + `vi.mock()` |
+
+### 実行方法
+
+#### バックエンド
+
+```bash
+# 単体テスト
+npm run -w backend test
+
+# E2E テスト
+npm run -w backend test:e2e
+```
+
+#### フロントエンド
+
+```bash
+# 単体テスト（ウォッチモード・デフォルト）
+npm run -w frontend test
+
+# 1回実行して終了（CI 向け）
+cd frontend && npx ng test --watch=false
+```
+
 ## データベース
 
 ### マイグレーション
@@ -346,73 +437,4 @@ erDiagram
         int random_group
         int senior_flag
     }
-```
-
-## テスト
-
-### テスト構成
-
-テストは各パッケージの `test/` ディレクトリに配置し、`src/` の構造をミラーリングしています。
-外部サービス（Cognito・PostgreSQL）はすべてモック化するため、**Kubernetes や DB 不要でローカル単体実行**できます。
-
-```
-backend/
-└── test/
-    ├── unit/                          # Jest 単体テスト
-    │   ├── auth/
-    │   │   └── auth.service.spec.ts   # AuthService
-    │   ├── common/guards/
-    │   │   └── auth.guard.spec.ts     # AuthGuard (JWT 検証)
-    │   ├── race/
-    │   │   ├── breeding-count.service.spec.ts
-    │   │   ├── race.service.spec.ts
-    │   │   └── race-pattern.service.spec.ts
-    │   └── umamusume/
-    │       └── umamusume.service.spec.ts
-    └── e2e/                           # Jest + Supertest E2E テスト
-        ├── race.e2e-spec.ts
-        └── umamusume.e2e-spec.ts
-
-frontend/
-└── test/
-    └── unit/                          # Vitest 単体テスト
-        ├── core/
-        │   ├── guards/
-        │   │   └── auth.guard.spec.ts
-        │   ├── interceptors/
-        │   │   └── auth.interceptor.spec.ts
-        │   └── services/
-        │       └── auth.service.spec.ts
-        └── shared/components/toast/
-            └── toast.service.spec.ts
-```
-
-### テスト技術スタック
-
-| 対象 | フレームワーク | モック |
-|------|--------------|--------|
-| バックエンド 単体 | Jest + ts-jest | PrismaService・Cognito を手動モック |
-| バックエンド E2E | Jest + Supertest | NestJS TestingModule + MockAuthGuard |
-| フロントエンド 単体 | Vitest (`@angular/build:unit-test`) | Angular TestBed + `vi.mock()` |
-
-### 実行方法
-
-#### バックエンド
-
-```bash
-# 単体テスト
-npm run -w backend test
-
-# E2E テスト
-npm run -w backend test:e2e
-```
-
-#### フロントエンド
-
-```bash
-# 単体テスト（ウォッチモード・デフォルト）
-npm run -w frontend test
-
-# 1回実行して終了（CI 向け）
-cd frontend && npx ng test --watch=false
 ```
