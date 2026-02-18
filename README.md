@@ -91,8 +91,7 @@ Uma_Crown_Simulator/
 │   │   │   ├── race-list/           # レース一覧 (馬場・距離フィルタ)
 │   │   │   └── remaining-race/      # 残レース管理
 │   │   │       ├── remaining-race-list.ts     # 残レース一覧 (全ウマ娘)
-│   │   │       ├── remaining-race-pattern.ts  # 育成パターン提案
-│   │   │       └── remaining-race-manual.ts   # 手動レース登録
+│   │   │       └── remaining-race-pattern.ts  # 育成パターン提案
 │   │   ├── shared/components/       # 共有UIコンポーネント
 │   │   │   ├── sidebar/             # ナビゲーションサイドバー
 │   │   │   ├── aptitude-badge/      # 適性ランクバッジ (S~G)

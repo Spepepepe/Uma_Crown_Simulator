@@ -42,13 +42,6 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'remaining-race/:id/manual',
-        loadComponent: () =>
-          import('./features/remaining-race/remaining-race-manual').then(
-            (m) => m.RemainingRaceManualComponent,
-          ),
-      },
-      {
         path: 'remaining-race/:id/pattern',
         loadComponent: () =>
           import('./features/remaining-race/remaining-race-pattern').then(
