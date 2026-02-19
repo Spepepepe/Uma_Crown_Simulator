@@ -11,15 +11,15 @@ import { Race } from '@shared/types';
   template: `
     <div class="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
          style="background-image: url('/image/backgroundFile/race-list.png')"></div>
-    <div class="min-h-screen p-6">
+    <div class="p-6 flex flex-col" style="height: 100dvh;">
     @if (loading()) {
-      <div class="min-h-full flex justify-center items-center">
+      <div class="flex-1 flex justify-center items-center">
         <p class="text-gray-500 text-xl">読み込み中...</p>
       </div>
     } @else {
-      <div class="space-y-4">
+      <div class="flex flex-col gap-4 flex-1 min-h-0">
         <!-- フィルタ -->
-        <div class="flex gap-4">
+        <div class="flex gap-4 flex-shrink-0">
           <div>
             <label class="font-semibold mr-2">馬場</label>
             <select [(ngModel)]="selectedState" (ngModelChange)="fetchRaces()" class="border rounded p-2">
@@ -38,35 +38,47 @@ import { Race } from '@shared/types';
               <option [ngValue]="4">長距離</option>
             </select>
           </div>
+          <div class="ml-auto self-center text-sm text-gray-600">全{{ races().length }}件</div>
         </div>
 
-        <!-- レーステーブル -->
-        <table class="table-auto w-full border-collapse border border-gray-300">
-          <thead class="bg-gray-200 sticky top-0">
-            <tr>
-              <th class="border border-gray-500 px-4 py-2">レース名</th>
-              <th class="border border-gray-500 px-4 py-2">クラス</th>
-              <th class="border border-gray-500 px-4 py-2">馬場</th>
-              <th class="border border-gray-500 px-4 py-2">距離</th>
-              <th class="border border-gray-500 px-4 py-2">ファン数</th>
-              <th class="border border-gray-500 px-4 py-2">出走時期</th>
-              <th class="border border-gray-500 px-4 py-2">月</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (race of races(); track race.race_id) {
-              <tr class="hover:bg-gray-50">
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ race.race_name }}</td>
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ getRaceRank(race.race_rank) }}</td>
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ race.race_state ? 'ダート' : '芝' }}</td>
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ getDistance(race.distance) }}/{{ race.distance_detail }}m</td>
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ race.num_fans }}</td>
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ getRunSeason(race) }}</td>
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ race.race_months }}月{{ race.half_flag ? '後半' : '前半' }}</td>
+        <!-- レーステーブル（縦スクロール） -->
+        <div class="overflow-y-auto flex-1 min-h-0 border border-gray-300 rounded">
+          <table class="w-full border-collapse" style="table-layout: fixed;">
+            <colgroup>
+              <col style="width: 160px;">
+              <col style="width: 64px;">
+              <col style="width: 64px;">
+              <col style="width: 120px;">
+              <col style="width: 80px;">
+              <col style="width: 140px;">
+              <col style="width: 100px;">
+            </colgroup>
+            <thead class="bg-gray-200 sticky top-0 z-10">
+              <tr>
+                <th class="border border-gray-500 px-2 py-2 text-sm">レース名</th>
+                <th class="border border-gray-500 px-2 py-2 text-sm">クラス</th>
+                <th class="border border-gray-500 px-2 py-2 text-sm">馬場</th>
+                <th class="border border-gray-500 px-2 py-2 text-sm">距離</th>
+                <th class="border border-gray-500 px-2 py-2 text-sm">ファン数</th>
+                <th class="border border-gray-500 px-2 py-2 text-sm">出走時期</th>
+                <th class="border border-gray-500 px-2 py-2 text-sm">月</th>
               </tr>
-            }
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              @for (race of races(); track race.race_id) {
+                <tr class="hover:bg-gray-50">
+                  <td class="border border-gray-500 px-2 py-2 text-center text-sm overflow-hidden text-ellipsis whitespace-nowrap" [title]="race.race_name">{{ race.race_name }}</td>
+                  <td class="border border-gray-500 px-2 py-2 text-center text-sm">{{ getRaceRank(race.race_rank) }}</td>
+                  <td class="border border-gray-500 px-2 py-2 text-center text-sm">{{ race.race_state ? 'ダート' : '芝' }}</td>
+                  <td class="border border-gray-500 px-2 py-2 text-center text-sm">{{ getDistance(race.distance) }}/{{ race.distance_detail }}m</td>
+                  <td class="border border-gray-500 px-2 py-2 text-center text-sm">{{ race.num_fans }}</td>
+                  <td class="border border-gray-500 px-2 py-2 text-center text-sm">{{ getRunSeason(race) }}</td>
+                  <td class="border border-gray-500 px-2 py-2 text-center text-sm">{{ race.race_months }}月{{ race.half_flag ? '後半' : '前半' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
       </div>
     }
     </div>
