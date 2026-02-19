@@ -1,5 +1,4 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { Router } from '@angular/router';
 import {
   CognitoUserPool,
   CognitoUser,
@@ -21,7 +20,7 @@ export class AuthService {
   /** ログイン状態（トークンが存在する場合 true） */
   readonly isLoggedIn = computed(() => !!this.tokenSignal());
 
-  constructor(private router: Router) {
+  constructor() {
     this.userPool = new CognitoUserPool({
       UserPoolId: environment.cognito.userPoolId,
       ClientId: environment.cognito.clientId,
@@ -139,7 +138,6 @@ export class AuthService {
       cognitoUser.signOut();
     }
     this.tokenSignal.set(null);
-    this.router.navigate(['/login']);
   }
 
   /** 現在のIDトークンを返す

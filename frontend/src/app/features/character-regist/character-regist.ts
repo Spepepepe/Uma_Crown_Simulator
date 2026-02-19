@@ -1,8 +1,8 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
 import { AptitudeBadgeComponent } from '../../shared/components/aptitude-badge/aptitude-badge';
+import { NavigationService } from '../../core/services/navigation.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { environment } from '../../environments/environment';
 import { Umamusume, Race } from '@shared/types';
@@ -139,7 +139,7 @@ import { Umamusume, Race } from '@shared/types';
 /** ウマ娘と出走済みレースを登録するコンポーネント */
 export class CharacterRegistComponent implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly router = inject(Router);
+  private readonly navService = inject(NavigationService);
   private readonly toastService = inject(ToastService);
 
   /** 未登録ウマ娘の一覧 */
@@ -224,7 +224,7 @@ export class CharacterRegistComponent implements OnInit {
       .subscribe({
         next: () => {
           this.toastService.show('登録が完了しました', 'success');
-          this.router.navigate(['/character-list']);
+          this.navService.navigate({ page: 'character-list' });
         },
         error: (err) => {
           console.error('Registration failed:', err);

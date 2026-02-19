@@ -1,12 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { NavigationService } from '../../../core/services/navigation.service';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule],
   template: `
     <div class="fixed inset-0 flex items-center justify-center bg-cover bg-center bg-no-repeat"
          style="background-image: url('/image/backgroundFile/login-bg.png')">
@@ -50,7 +50,7 @@ import { AuthService } from '../../../core/services/auth.service';
             </button>
 
             <button
-              routerLink="/login"
+              (click)="navService.navigate({ page: 'login' })"
               class="w-full py-3 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition cursor-pointer"
             >
               戻る
@@ -115,7 +115,7 @@ import { AuthService } from '../../../core/services/auth.service';
 /** 新規ユーザー登録コンポーネント。登録→確認コード入力の2ステップフロー */
 export class RegisterComponent {
   private readonly authService = inject(AuthService);
-  private readonly router = inject(Router);
+  protected readonly navService = inject(NavigationService);
 
   /** メールアドレス入力値 */
   email = '';
@@ -168,7 +168,7 @@ export class RegisterComponent {
 
     if (result.success) {
       this.successMessage.set('アカウントが有効化されました。ログイン画面に移動します...');
-      setTimeout(() => this.router.navigate(['/login']), 2000);
+      setTimeout(() => this.navService.navigate({ page: 'login' }), 2000);
     } else {
       this.errorMessage.set(result.error ?? '確認に失敗しました');
     }

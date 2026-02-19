@@ -1,8 +1,8 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
 import { environment } from '../../environments/environment';
 import { RemainingRace } from '@shared/types';
+import { NavigationService } from '../../core/services/navigation.service';
 
 @Component({
   selector: 'app-remaining-race-list',
@@ -107,7 +107,7 @@ import { RemainingRace } from '@shared/types';
 /** 残レース一覧を表示するコンポーネント */
 export class RemainingRaceListComponent implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly router = inject(Router);
+  private readonly navService = inject(NavigationService);
 
   /** 残レース情報の一覧 */
   remainingRaces = signal<RemainingRace[]>([]);
@@ -143,7 +143,7 @@ export class RemainingRaceListComponent implements OnInit {
    * @param r - 対象の残レース情報
    */
   openPattern(r: RemainingRace) {
-    this.router.navigate(['/remaining-race', r.umamusume.umamusume_id, 'pattern']);
+    this.navService.navigate({ page: 'remaining-race-pattern', umamusumeId: r.umamusume.umamusume_id });
   }
 
   /**

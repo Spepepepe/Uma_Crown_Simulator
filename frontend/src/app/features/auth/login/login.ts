@@ -1,12 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { NavigationService } from '../../../core/services/navigation.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule],
   template: `
     <div class="fixed inset-0 flex items-center justify-center bg-cover bg-center bg-no-repeat"
          style="background-image: url('/image/backgroundFile/login-bg.png')">
@@ -46,13 +46,13 @@ import { AuthService } from '../../../core/services/auth.service';
             {{ loading() ? 'ログイン中...' : 'ログイン' }}
           </button>
 
-          <div class="text-center space-y-2 mt-4">
-            <a
-              routerLink="/register"
+          <div class="text-center mt-4">
+            <button
+              (click)="navService.navigate({ page: 'register' })"
               class="text-blue-500 hover:underline text-sm cursor-pointer"
             >
               新規登録
-            </a>
+            </button>
           </div>
         </div>
       </div>
@@ -62,7 +62,7 @@ import { AuthService } from '../../../core/services/auth.service';
 /** ログイン画面コンポーネント */
 export class LoginComponent {
   private readonly authService = inject(AuthService);
-  private readonly router = inject(Router);
+  protected readonly navService = inject(NavigationService);
 
   /** メールアドレス入力値 */
   email = '';
@@ -86,7 +86,7 @@ export class LoginComponent {
     const result = await this.authService.login(this.email, this.password);
 
     if (result.success) {
-      this.router.navigate(['/character-list']);
+      this.navService.navigate({ page: 'character-list' });
     } else {
       this.errorMessage.set(result.error ?? 'ログインに失敗しました');
     }
