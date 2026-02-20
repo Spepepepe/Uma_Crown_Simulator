@@ -33,16 +33,12 @@ export class RaceService {
   }
 
   /** 登録用レースリスト取得 (G1/G2/G3)
-   * @returns G1~G3レースの一覧（ランク・月・前後半順）
+   * @returns G1~G3レースの一覧（ID順）
    */
   async getRegistRaceList() {
     return this.prisma.raceTable.findMany({
       where: { race_rank: { in: [1, 2, 3] } },
-      orderBy: [
-        { race_rank: 'asc' },
-        { race_months: 'asc' },
-        { half_flag: 'asc' },
-      ],
+      orderBy: { race_id: 'asc' },
     });
   }
 

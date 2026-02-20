@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { AptitudeBadgeComponent } from '../../shared/components/aptitude-badge/aptitude-badge';
@@ -7,6 +7,11 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 import { environment } from '../../environments/environment';
 import { Umamusume, Race } from '@shared/types';
 
+type RaceTab = 'G1' | 'G2' | 'G3';
+
+/** 1ページあたりの表示レース数（5行 × 3列） */
+const PAGE_SIZE = 15;
+
 @Component({
   selector: 'app-character-regist',
   standalone: true,
@@ -14,125 +19,191 @@ import { Umamusume, Race } from '@shared/types';
   template: `
     <div class="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
          style="background-image: url('/image/backgroundFile/character-regist.png')"></div>
-    <div class="min-h-screen p-6">
-    <!-- ヘッダー: キャラ画像 + セレクト + 適性表示 -->
-    <div class="flex items-center w-full mb-6 sticky top-0 bg-white/50 z-10 p-4 gap-6 flex-wrap justify-center">
-      <!-- キャラ画像 -->
-      <div class="p-2 bg-gradient-to-b from-green-400 to-green-100 rounded-xl shadow-lg">
-        <div
-          class="w-72 h-72 rounded-lg bg-gray-100 bg-cover bg-center bg-no-repeat"
-          [style.background-image]="selectedUmamusume()
-            ? 'url(/image/umamusumeData/' + selectedUmamusume()!.umamusume_name + '.png)'
-            : 'none'"
-        ></div>
-      </div>
 
-      <!-- セレクト + 適性 -->
-      <div class="py-6 px-8 rounded-lg bg-white/70 shadow-lg">
-        <div class="flex items-center mb-6">
-          <label class="font-semibold mr-2 whitespace-nowrap">選択ウマ娘</label>
-          <select
-            class="flex-grow w-72 bg-green-200 border border-gray-300 rounded-lg p-3 text-pink-500 text-xl
-                   transition-all duration-300 hover:scale-105 hover:shadow-md"
-            [ngModel]="selectedUmamusumeId()"
-            (ngModelChange)="onSelectUmamusume($event)"
-          >
-            <option [ngValue]="null">ウマ娘を選択</option>
-            @for (u of umamusumes(); track u.umamusume_id) {
-              <option [ngValue]="u.umamusume_id">{{ u.umamusume_name }}</option>
-            }
-          </select>
+    <div class="flex h-screen overflow-hidden">
+
+      <!-- 左パネル: 選択・画像・適性 -->
+      <div class="w-80 flex-shrink-0 flex flex-col items-center py-4 px-4 gap-3 bg-black/40 overflow-y-auto">
+
+        <!-- 選択ドロップダウン -->
+        <select
+          class="w-full bg-green-200 border border-gray-300 rounded-lg p-2 text-pink-500 text-sm
+                 transition-all duration-300 hover:shadow-md cursor-pointer"
+          [ngModel]="selectedUmamusumeId()"
+          (ngModelChange)="onSelectUmamusume($event)"
+        >
+          <option [ngValue]="null">ウマ娘を選択</option>
+          @for (u of umamusumes(); track u.umamusume_id) {
+            <option [ngValue]="u.umamusume_id">{{ u.umamusume_name }}</option>
+          }
+        </select>
+
+        <!-- ウマ娘画像 -->
+        <div class="p-2 bg-gradient-to-b from-green-400 to-green-100 rounded-xl shadow-lg">
+          <div
+            class="w-64 h-64 rounded-lg bg-gray-200 bg-cover bg-center bg-no-repeat"
+            [style.background-image]="selectedUmamusume()
+              ? 'url(/image/umamusumeData/' + selectedUmamusume()!.umamusume_name + '.png)'
+              : 'none'"
+          ></div>
         </div>
 
-        @if (selectedUmamusume()) {
-          <div class="space-y-4">
-            <div>
-              <div class="font-semibold mb-2">バ場適性</div>
-              <div class="flex gap-2">
-                <app-aptitude-badge name="芝" [aptitude]="selectedUmamusume()!.turf_aptitude" />
-                <app-aptitude-badge name="ダート" [aptitude]="selectedUmamusume()!.dirt_aptitude" />
-              </div>
-            </div>
-            <div>
-              <div class="font-semibold mb-2">距離適性</div>
-              <div class="flex gap-2">
-                <app-aptitude-badge name="短距離" [aptitude]="selectedUmamusume()!.sprint_aptitude" />
-                <app-aptitude-badge name="マイル" [aptitude]="selectedUmamusume()!.mile_aptitude" />
-                <app-aptitude-badge name="中距離" [aptitude]="selectedUmamusume()!.classic_aptitude" />
-                <app-aptitude-badge name="長距離" [aptitude]="selectedUmamusume()!.long_distance_aptitude" />
-              </div>
-            </div>
-            <div>
-              <div class="font-semibold mb-2">脚質適性</div>
-              <div class="flex gap-2">
-                <app-aptitude-badge name="逃げ" [aptitude]="selectedUmamusume()!.front_runner_aptitude" />
-                <app-aptitude-badge name="先行" [aptitude]="selectedUmamusume()!.early_foot_aptitude" />
-                <app-aptitude-badge name="差し" [aptitude]="selectedUmamusume()!.midfield_aptitude" />
-                <app-aptitude-badge name="追込" [aptitude]="selectedUmamusume()!.closer_aptitude" />
-              </div>
+        <!-- 適性情報（常に表示、未選択時は "-" を表示） -->
+        <div class="w-full bg-white/80 rounded-lg p-3 space-y-3">
+          <!-- バ場適性 -->
+          <div>
+            <div class="text-xs font-bold text-gray-500 mb-1">バ場適性</div>
+            <div class="space-y-2">
+              <app-aptitude-badge name="芝" [aptitude]="selectedUmamusume()?.turf_aptitude" />
+              <app-aptitude-badge name="ダート" [aptitude]="selectedUmamusume()?.dirt_aptitude" />
             </div>
           </div>
-        }
+          <!-- 距離適性 -->
+          <div>
+            <div class="text-xs font-bold text-gray-500 mb-1">距離適性</div>
+            <div class="space-y-2">
+              <app-aptitude-badge name="短距離" [aptitude]="selectedUmamusume()?.sprint_aptitude" />
+              <app-aptitude-badge name="マイル" [aptitude]="selectedUmamusume()?.mile_aptitude" />
+              <app-aptitude-badge name="中距離" [aptitude]="selectedUmamusume()?.classic_aptitude" />
+              <app-aptitude-badge name="長距離" [aptitude]="selectedUmamusume()?.long_distance_aptitude" />
+            </div>
+          </div>
+          <!-- 脚質適性 -->
+          <div>
+            <div class="text-xs font-bold text-gray-500 mb-1">脚質適性</div>
+            <div class="space-y-2">
+              <app-aptitude-badge name="逃げ" [aptitude]="selectedUmamusume()?.front_runner_aptitude" />
+              <app-aptitude-badge name="先行" [aptitude]="selectedUmamusume()?.early_foot_aptitude" />
+              <app-aptitude-badge name="差し" [aptitude]="selectedUmamusume()?.midfield_aptitude" />
+              <app-aptitude-badge name="追込" [aptitude]="selectedUmamusume()?.closer_aptitude" />
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <!-- レーステーブル -->
-    <div class="mt-6">
-      <div class="overflow-y-auto max-h-[calc(100vh-22rem)]">
-        <table class="table-auto w-full border-collapse border border-gray-300">
-          <thead class="bg-gray-200 sticky top-0">
-            <tr>
-              <th class="border border-gray-500 px-2 py-2">出走済</th>
-              <th class="border border-gray-500 px-4 py-2">レース名</th>
-              <th class="border border-gray-500 px-4 py-2">クラス</th>
-              <th class="border border-gray-500 px-4 py-2">馬場</th>
-              <th class="border border-gray-500 px-4 py-2">距離</th>
-              <th class="border border-gray-500 px-4 py-2">出走時期</th>
-              <th class="border border-gray-500 px-4 py-2">月</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (race of races(); track race.race_id) {
-              <tr class="hover:bg-gray-50">
-                <td class="border border-gray-500 px-2 py-2 text-center">
-                  <input
-                    type="checkbox"
-                    class="h-6 w-6"
-                    [checked]="race.checked"
-                    (change)="onCheckboxChange(race.race_id, $event)"
+      <!-- 右パネル: タブ + レースグリッド + ボタン -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+
+        <!-- タブ -->
+        <div class="flex gap-1 px-4 pt-3 flex-shrink-0">
+          @for (tab of tabs; track tab) {
+            <button
+              class="px-5 py-2 rounded-t-lg font-bold text-sm transition-all duration-200"
+              [class]="activeTab() === tab
+                ? 'bg-green-500 text-white shadow-lg'
+                : 'bg-white/60 text-gray-700 hover:bg-white/80'"
+              (click)="onTabChange(tab)"
+            >
+              {{ tabLabel(tab) }}
+              <span class="ml-1 text-xs opacity-80">({{ checkedCount(tab) }}/{{ totalCount(tab) }})</span>
+            </button>
+          }
+        </div>
+
+        <!-- レースグリッド + 矢印ナビ -->
+        <div class="flex-1 flex items-stretch overflow-hidden px-1 py-2 bg-black/20 min-h-0">
+
+          <!-- 左矢印 -->
+          <button
+            class="flex-shrink-0 w-10 flex items-center justify-center text-white text-4xl font-bold
+                   rounded-lg transition-all duration-200"
+            [class]="canGoPrev()
+              ? 'opacity-80 hover:opacity-100 hover:bg-white/20 cursor-pointer'
+              : 'opacity-20 cursor-not-allowed'"
+            [disabled]="!canGoPrev()"
+            (click)="goPrev()"
+          >
+            ‹
+          </button>
+
+          <!-- レースグリッド 3列 × 5行 -->
+          <div
+            class="flex-1 grid grid-cols-3 gap-2 min-h-0 h-full"
+            style="grid-template-rows: repeat(5, 1fr);"
+          >
+            @for (race of pagedRaces(); track race.race_id) {
+              <div
+                class="relative cursor-pointer rounded-xl overflow-hidden shadow-md
+                       transition-all duration-150 hover:scale-105 hover:shadow-xl border-2 flex flex-col"
+                [class]="race.checked
+                  ? 'border-green-400 bg-green-900/60'
+                  : 'border-white/20 bg-black/50'"
+                (click)="toggleRace(race.race_id)"
+              >
+                <!-- レース画像 -->
+                <div class="flex-1 flex items-center justify-center overflow-hidden">
+                  <img
+                    [src]="'/image/raceData/' + race.race_name + '.png'"
+                    [alt]="race.race_name"
+                    class="w-full h-full object-contain transition-all duration-200"
+                    [class]="race.checked ? 'opacity-100' : 'opacity-50 grayscale'"
                   />
-                </td>
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ race.race_name }}</td>
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ getRaceRank(race.race_rank) }}</td>
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ race.race_state ? 'ダート' : '芝' }}</td>
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ getDistance(race.distance) }}/{{ race.distance_detail }}m</td>
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ getRunSeason(race) }}</td>
-                <td class="border border-gray-500 px-4 py-2 text-center">{{ race.race_months }}月{{ race.half_flag ? '後半' : '前半' }}</td>
-              </tr>
+                </div>
+                <!-- チェックマーク -->
+                @if (race.checked) {
+                  <div class="absolute top-1 right-1 bg-green-500 text-white rounded-full w-5 h-5
+                               flex items-center justify-center text-xs font-bold shadow">
+                    ✓
+                  </div>
+                }
+                <!-- レース名 -->
+                <div class="text-white text-xs text-center font-semibold py-0.5 px-1 bg-black/60 truncate flex-shrink-0">
+                  {{ race.race_name }}
+                </div>
+              </div>
             }
-          </tbody>
-        </table>
-      </div>
+            <!-- 空セルでグリッドを満たす -->
+            @for (_ of emptySlots(); track $index) {
+              <div></div>
+            }
+          </div>
 
-      <!-- 登録ボタンエリア -->
-      <div class="mt-6 flex justify-center items-center space-x-4">
-        <button
-          class="bg-green-500 text-white py-2 px-4 rounded-md shadow-md hover:bg-green-600 cursor-pointer"
-          (click)="selectAll()"
-        >
-          全出走
-        </button>
+          <!-- 右矢印 -->
+          <button
+            class="flex-shrink-0 w-10 flex items-center justify-center text-white text-4xl font-bold
+                   rounded-lg transition-all duration-200"
+            [class]="canGoNext()
+              ? 'opacity-80 hover:opacity-100 hover:bg-white/20 cursor-pointer'
+              : 'opacity-20 cursor-not-allowed'"
+            [disabled]="!canGoNext()"
+            (click)="goNext()"
+          >
+            ›
+          </button>
+        </div>
 
-        <button
-          class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white py-3 px-8 rounded-full shadow-lg
-                 hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-          [disabled]="!selectedUmamusume()"
-          (click)="registerCharacter()"
-        >
-          登録
-        </button>
+        <!-- ページドット + ボタンエリア -->
+        <div class="flex-shrink-0 flex flex-col items-center gap-2 py-3 px-4 bg-black/30">
+          <!-- ページインジケーター（ドット） -->
+          <div class="flex gap-1.5">
+            @for (p of pageIndicators(); track $index) {
+              <span
+                class="w-2 h-2 rounded-full transition-all duration-200"
+                [class]="p === currentPage() ? 'bg-white scale-125' : 'bg-white/40'"
+              ></span>
+            }
+          </div>
+          <!-- ボタン -->
+          <div class="flex gap-4">
+            <button
+              class="bg-green-500 text-white py-2 px-6 rounded-md shadow-md
+                     hover:bg-green-600 cursor-pointer font-semibold transition-colors duration-200"
+              (click)="selectAll()"
+            >
+              全出走
+            </button>
+            <button
+              class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white py-2 px-8
+                     rounded-full shadow-lg hover:scale-105 transition-all duration-300
+                     disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-semibold"
+              [disabled]="!selectedUmamusume()"
+              (click)="registerCharacter()"
+            >
+              登録
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
     </div>
   `,
 })
@@ -150,11 +221,112 @@ export class CharacterRegistComponent implements OnInit {
   selectedUmamusume = signal<Umamusume | null>(null);
   /** 選択中のウマ娘ID */
   selectedUmamusumeId = signal<number | null>(null);
+  /** 現在表示中のタブ */
+  activeTab = signal<RaceTab>('G1');
+  /** 現在のページ番号（0始まり） */
+  currentPage = signal<number>(0);
+
+  readonly tabs: RaceTab[] = ['G1', 'G2', 'G3'];
+
+  /** 現在タブのレース一覧 */
+  filteredRaces = computed(() => {
+    const rankMap: Record<RaceTab, number> = { G1: 1, G2: 2, G3: 3 };
+    return this.races().filter((r) => r.race_rank === rankMap[this.activeTab()]);
+  });
+
+  /** 現在タブの総ページ数 */
+  pageCount = computed(() =>
+    Math.max(1, Math.ceil(this.filteredRaces().length / PAGE_SIZE)),
+  );
+
+  /** 現在ページに表示するレース */
+  pagedRaces = computed(() => {
+    const start = this.currentPage() * PAGE_SIZE;
+    return this.filteredRaces().slice(start, start + PAGE_SIZE);
+  });
+
+  /** グリッドを5×3に満たすための空スロット */
+  emptySlots = computed(() => {
+    const fill = PAGE_SIZE - this.pagedRaces().length;
+    return fill > 0 ? Array(fill) : [];
+  });
+
+  /** ページドット用インデックス配列 */
+  pageIndicators = computed(() =>
+    Array.from({ length: this.pageCount() }, (_, i) => i),
+  );
+
+  /** 左矢印が有効かどうか */
+  canGoPrev = computed(() => this.activeTab() !== 'G1' || this.currentPage() > 0);
+
+  /** 右矢印が有効かどうか */
+  canGoNext = computed(() => {
+    const isLastTab = this.activeTab() === 'G3';
+    const isLastPage = this.currentPage() >= this.pageCount() - 1;
+    return !(isLastTab && isLastPage);
+  });
 
   /** コンポーネント初期化時にウマ娘・レース一覧を取得する */
   ngOnInit() {
     this.fetchUmamusumes();
     this.fetchRaces();
+  }
+
+  /** タブ名を表示用ラベルに変換する */
+  tabLabel(tab: RaceTab): string {
+    switch (tab) {
+      case 'G1': return 'G I';
+      case 'G2': return 'G II';
+      case 'G3': return 'G III';
+    }
+  }
+
+  /** 指定タブの出走済みレース数を返す */
+  checkedCount(tab: RaceTab): number {
+    const rankMap: Record<RaceTab, number> = { G1: 1, G2: 2, G3: 3 };
+    return this.races().filter((r) => r.race_rank === rankMap[tab] && r.checked).length;
+  }
+
+  /** 指定タブの総レース数を返す */
+  totalCount(tab: RaceTab): number {
+    const rankMap: Record<RaceTab, number> = { G1: 1, G2: 2, G3: 3 };
+    return this.races().filter((r) => r.race_rank === rankMap[tab]).length;
+  }
+
+  /** タブ切り替え（ページを先頭にリセット） */
+  onTabChange(tab: RaceTab) {
+    this.activeTab.set(tab);
+    this.currentPage.set(0);
+  }
+
+  /** 次のページへ。最終ページなら次タブの先頭へ */
+  goNext() {
+    if (this.currentPage() < this.pageCount() - 1) {
+      this.currentPage.update((p) => p + 1);
+    } else {
+      const idx = this.tabs.indexOf(this.activeTab());
+      if (idx < this.tabs.length - 1) {
+        this.activeTab.set(this.tabs[idx + 1]);
+        this.currentPage.set(0);
+      }
+    }
+  }
+
+  /** 前のページへ。先頭ページなら前タブの最終ページへ */
+  goPrev() {
+    if (this.currentPage() > 0) {
+      this.currentPage.update((p) => p - 1);
+    } else {
+      const idx = this.tabs.indexOf(this.activeTab());
+      if (idx > 0) {
+        const prevTab = this.tabs[idx - 1];
+        const rankMap: Record<RaceTab, number> = { G1: 1, G2: 2, G3: 3 };
+        const prevRaces = this.races().filter((r) => r.race_rank === rankMap[prevTab]);
+        const prevPageCount = Math.max(1, Math.ceil(prevRaces.length / PAGE_SIZE));
+        this.activeTab.set(prevTab);
+        this.currentPage.set(prevPageCount - 1);
+      }
+    }
   }
 
   /** 未登録ウマ娘一覧をAPIから取得する */
@@ -178,9 +350,7 @@ export class CharacterRegistComponent implements OnInit {
       });
   }
 
-  /** ウマ娘セレクトボックス変更時の処理
-   * @param id - 選択されたウマ娘ID（null の場合は未選択）
-   */
+  /** ウマ娘セレクトボックス変更時の処理 */
   onSelectUmamusume(id: number | null) {
     this.selectedUmamusumeId.set(id);
     if (id) {
@@ -191,18 +361,14 @@ export class CharacterRegistComponent implements OnInit {
     }
   }
 
-  /** レースチェックボックス変更時の処理
-   * @param raceId - 変更されたレースID
-   * @param event - チェックボックスのchangeイベント
-   */
-  onCheckboxChange(raceId: number, event: Event) {
-    const checked = (event.target as HTMLInputElement).checked;
+  /** レースカードクリック時に出走済み状態をトグルする */
+  toggleRace(raceId: number) {
     this.races.update((races) =>
-      races.map((r) => (r.race_id === raceId ? { ...r, checked } : r)),
+      races.map((r) => (r.race_id === raceId ? { ...r, checked: !r.checked } : r)),
     );
   }
 
-  /** 全レースをチェック状態にする */
+  /** 全レースを出走済みにする */
   selectAll() {
     this.races.update((races) => races.map((r) => ({ ...r, checked: true })));
   }
@@ -231,44 +397,5 @@ export class CharacterRegistComponent implements OnInit {
           this.toastService.show('登録に失敗しました', 'error');
         },
       });
-  }
-
-  /** レースランク番号をGI/GII/GIIIに変換する
-   * @param rank - ランク番号（1~3）
-   * @returns ランク文字列
-   */
-  getRaceRank(rank: number): string {
-    switch (rank) {
-      case 1: return 'GI';
-      case 2: return 'GII';
-      case 3: return 'GIII';
-      default: return '';
-    }
-  }
-
-  /** 距離区分番号を日本語名に変換する
-   * @param d - 距離区分番号（1~4）
-   * @returns 距離区分名
-   */
-  getDistance(d: number): string {
-    switch (d) {
-      case 1: return '短距離';
-      case 2: return 'マイル';
-      case 3: return '中距離';
-      case 4: return '長距離';
-      default: return '';
-    }
-  }
-
-  /** レースの出走可能時期を日本語スラッシュ区切りで返す
-   * @param race - 対象レース
-   * @returns 「ジュニア/クラシック/シニア」形式の文字列
-   */
-  getRunSeason(race: Race): string {
-    const parts: string[] = [];
-    if (race.junior_flag) parts.push('ジュニア');
-    if (race.classic_flag) parts.push('クラシック');
-    if (race.senior_flag) parts.push('シニア');
-    return parts.join('/');
   }
 }
