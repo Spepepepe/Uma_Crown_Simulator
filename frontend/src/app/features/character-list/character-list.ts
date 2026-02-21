@@ -16,8 +16,8 @@ import { gradeColor } from '@ui/utils/color-mapper';
           <p class="text-gray-500 text-xl">読み込み中...</p>
         </div>
       } @else {
-        <!-- 4列グリッド -->
-        <div class="grid grid-cols-4 gap-4">
+        <!-- グリッド: スマホ2列 / タブレット3列 / PC4列 -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           @for (reg of registUmamusumes(); track reg.umamusume.umamusume_id) {
             <div
               class="cursor-pointer rounded-xl overflow-hidden shadow-md transition-all duration-150

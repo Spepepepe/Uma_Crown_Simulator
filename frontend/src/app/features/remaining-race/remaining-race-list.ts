@@ -17,7 +17,7 @@ import { getRaceCountClass, getRaceCountDisplay } from '@ui/utils/color-mapper';
       </div>
     } @else {
       <div class="overflow-x-auto bg-black/30 backdrop-blur-sm rounded-xl shadow-lg border border-white/20">
-        <table class="table-auto w-full border-collapse">
+        <table class="table-auto w-full min-w-[640px] border-collapse">
           <!-- ヘッダー -->
           <thead class="sticky top-0">
             <tr>

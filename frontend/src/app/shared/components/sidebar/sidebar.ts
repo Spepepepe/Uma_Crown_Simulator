@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { AuthService } from '@core/services/auth.service';
 import { NavigationService, ViewState } from '@core/services/navigation.service';
 
@@ -27,7 +27,34 @@ const sidebarItems: SidebarItem[] = [
   standalone: true,
   imports: [],
   template: `
-    <nav class="w-64 h-full bg-white/70 backdrop-blur-sm border-r border-gray-200 p-4 flex flex-col">
+    <!-- スマホ用ハンバーガーボタン (md以上は非表示) -->
+    <button
+      class="md:hidden fixed top-2 left-2 z-[60] bg-white/80 backdrop-blur-sm rounded-lg p-2 shadow-md border border-gray-200 cursor-pointer"
+      (click)="toggleDrawer()"
+    >
+      @if (drawerOpen()) {
+        <span class="block text-xl font-bold text-gray-700 leading-none">✕</span>
+      } @else {
+        <span class="block text-xl font-bold text-gray-700 leading-none">☰</span>
+      }
+    </button>
+
+    <!-- スマホ用背景オーバーレイ -->
+    @if (drawerOpen()) {
+      <div
+        class="md:hidden fixed inset-0 bg-black/50 z-40"
+        (click)="closeDrawer()"
+      ></div>
+    }
+
+    <!-- サイドバー本体 (PC: 通常表示 / スマホ: スライドドロワー) -->
+    <nav
+      class="fixed top-0 left-0 h-full w-64 z-50
+             bg-white/70 backdrop-blur-sm border-r border-gray-200 p-4 flex flex-col
+             transition-transform duration-300
+             md:static md:translate-x-0 md:z-auto"
+      [class.-translate-x-full]="!drawerOpen()"
+    >
       <h2 class="text-lg font-bold text-purple-600 mb-6 text-center">Uma Crown Simulator</h2>
 
       <ul class="flex-1 space-y-4">
@@ -65,6 +92,19 @@ export class SidebarComponent {
   private readonly authService = inject(AuthService);
   protected readonly navService = inject(NavigationService);
 
+  /** スマホ用ドロワーの開閉状態 */
+  protected readonly drawerOpen = signal(false);
+
+  /** ドロワーの開閉を切り替える */
+  protected toggleDrawer(): void {
+    this.drawerOpen.update(v => !v);
+  }
+
+  /** ドロワーを閉じる */
+  protected closeDrawer(): void {
+    this.drawerOpen.set(false);
+  }
+
   /** 指定ページが現在のアクティブページかどうかを返す */
   isActive(page: ViewState['page']): boolean {
     const current = this.navService.currentView().page;
@@ -77,10 +117,12 @@ export class SidebarComponent {
   /** サイドバー項目のページに遷移する（umamusumeId不要なページのみ） */
   navigateTo(page: ViewState['page']): void {
     this.navService.navigate({ page } as ViewState);
+    this.closeDrawer();
   }
 
   /** ログアウトボタンクリック時の処理 */
   onLogout() {
     this.authService.logout();
+    this.closeDrawer();
   }
 }

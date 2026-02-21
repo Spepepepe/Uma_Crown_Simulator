@@ -10,7 +10,7 @@ import { gradeBg, gradeBadge } from '@ui/utils/color-mapper';
   standalone: true,
   imports: [FormsModule],
   template: `
-    <div class="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
+    <div class="fixed inset-0 bg-cover bg-left md:bg-center bg-no-repeat -z-10"
          style="background-image: url('/image/backgroundFile/race-list.png')"></div>
     <div class="min-h-screen p-6 flex flex-col gap-4">
       @if (loading()) {
@@ -19,7 +19,7 @@ import { gradeBg, gradeBadge } from '@ui/utils/color-mapper';
         </div>
       } @else {
         <!-- フィルタ -->
-        <div class="flex gap-4 items-center flex-shrink-0">
+        <div class="flex flex-wrap gap-2 md:gap-4 items-center flex-shrink-0">
           <div>
             <label class="font-semibold mr-2 text-white drop-shadow">馬場</label>
             <select [(ngModel)]="selectedState" (ngModelChange)="fetchRaces()" class="border rounded p-2">
@@ -41,8 +41,8 @@ import { gradeBg, gradeBadge } from '@ui/utils/color-mapper';
           <div class="ml-auto text-sm text-white drop-shadow">全{{ races().length }}件</div>
         </div>
 
-        <!-- 4列グリッド -->
-        <div class="grid grid-cols-4 gap-4">
+        <!-- グリッド: スマホ2列 / タブレット3列 / PC4列 -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           @for (race of races(); track race.race_id) {
             <div
               class="cursor-pointer rounded-xl overflow-hidden shadow-md transition-all duration-150

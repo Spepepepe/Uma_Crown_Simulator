@@ -1,7 +1,7 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AptitudeBadgeComponent } from '@ui/components/aptitude-badge/aptitude-badge';
 import { NavigationService } from '@core/services/navigation.service';
+import { gradeColor } from '@ui/utils/color-mapper';
 import { ToastService } from '@ui/components/toast/toast.service';
 import { Umamusume, Race, RaceTab } from '@shared/types';
 import { CharacterService } from '@core/services/character.service';
@@ -13,15 +13,15 @@ const PAGE_SIZE = 15;
 @Component({
   selector: 'app-character-regist',
   standalone: true,
-  imports: [FormsModule, AptitudeBadgeComponent],
+  imports: [FormsModule],
   template: `
     <div class="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
          style="background-image: url('/image/backgroundFile/character-regist.png')"></div>
 
-    <div class="flex h-screen overflow-hidden">
+    <div class="flex flex-col md:flex-row h-screen overflow-hidden">
 
       <!-- 左パネル: 選択・画像・適性 -->
-      <div class="w-80 flex-shrink-0 flex flex-col items-center py-4 px-4 gap-3 bg-black/40 overflow-y-auto">
+      <div class="w-full md:w-80 flex-shrink-0 flex flex-col items-center py-3 md:py-4 px-4 gap-2 md:gap-3 bg-black/40 overflow-y-auto max-h-[38vh] md:max-h-none">
 
         <!-- 選択ドロップダウン -->
         <select
@@ -36,51 +36,90 @@ const PAGE_SIZE = 15;
           }
         </select>
 
-        <!-- ウマ娘画像 -->
-        <div class="p-2 bg-gradient-to-b from-green-400 to-green-100 rounded-xl shadow-lg">
-          <div
-            class="w-64 h-64 rounded-lg bg-gray-200 bg-cover bg-center bg-no-repeat"
-            [style.background-image]="selectedUmamusume()
-              ? 'url(/image/umamusumeData/' + selectedUmamusume()!.umamusume_name + '.png)'
-              : 'none'"
-          ></div>
-        </div>
+        <!-- スマホ: 画像(左) + 適性(右) の横並び / PC: 縦並び -->
+        <div class="flex flex-row md:flex-col gap-2 w-full items-start">
 
-        <!-- 適性情報（常に表示、未選択時は "-" を表示） -->
-        <div class="w-full bg-white/80 rounded-lg p-3 space-y-3">
-          <!-- バ場適性 -->
-          <div>
-            <div class="text-xs font-bold text-gray-500 mb-1">バ場適性</div>
-            <div class="space-y-2">
-              <app-aptitude-badge name="芝" [aptitude]="selectedUmamusume()?.turf_aptitude" />
-              <app-aptitude-badge name="ダート" [aptitude]="selectedUmamusume()?.dirt_aptitude" />
-            </div>
+          <!-- ウマ娘画像 -->
+          <div class="flex-shrink-0 p-1.5 md:p-2 bg-gradient-to-b from-green-400 to-green-100 rounded-xl shadow-lg">
+            <div
+              class="w-24 h-24 md:w-64 md:h-64 rounded-lg bg-gray-200 bg-cover bg-center bg-no-repeat"
+              [style.background-image]="selectedUmamusume()
+                ? 'url(/image/umamusumeData/' + selectedUmamusume()!.umamusume_name + '.png)'
+                : 'none'"
+            ></div>
           </div>
-          <!-- 距離適性 -->
-          <div>
-            <div class="text-xs font-bold text-gray-500 mb-1">距離適性</div>
-            <div class="space-y-2">
-              <app-aptitude-badge name="短距離" [aptitude]="selectedUmamusume()?.sprint_aptitude" />
-              <app-aptitude-badge name="マイル" [aptitude]="selectedUmamusume()?.mile_aptitude" />
-              <app-aptitude-badge name="中距離" [aptitude]="selectedUmamusume()?.classic_aptitude" />
-              <app-aptitude-badge name="長距離" [aptitude]="selectedUmamusume()?.long_distance_aptitude" />
+
+          <!-- 適性情報（ダイアログと同スタイル: ラベル + 横並び値） -->
+          <div class="flex-1 bg-white/80 rounded-lg p-2 md:p-3 space-y-1.5 md:space-y-2">
+
+            <!-- バ場適性 -->
+            <div class="flex items-stretch gap-1.5">
+              <div class="text-xs font-bold text-gray-500 w-10 flex-shrink-0 flex items-center">バ場</div>
+              <div class="flex gap-1 flex-1">
+                <div class="flex items-center justify-between px-2 py-1 rounded-lg flex-1 bg-gray-100 border border-gray-200">
+                  <span class="text-xs font-semibold text-gray-700">芝</span>
+                  <span class="text-sm font-black ml-1" [class]="gradeColor(selectedUmamusume()?.turf_aptitude ?? '')">{{ selectedUmamusume()?.turf_aptitude || '-' }}</span>
+                </div>
+                <div class="flex items-center justify-between px-2 py-1 rounded-lg flex-1 bg-gray-100 border border-gray-200">
+                  <span class="text-xs font-semibold text-gray-700">ダート</span>
+                  <span class="text-sm font-black ml-1" [class]="gradeColor(selectedUmamusume()?.dirt_aptitude ?? '')">{{ selectedUmamusume()?.dirt_aptitude || '-' }}</span>
+                </div>
+              </div>
             </div>
-          </div>
-          <!-- 脚質適性 -->
-          <div>
-            <div class="text-xs font-bold text-gray-500 mb-1">脚質適性</div>
-            <div class="space-y-2">
-              <app-aptitude-badge name="逃げ" [aptitude]="selectedUmamusume()?.front_runner_aptitude" />
-              <app-aptitude-badge name="先行" [aptitude]="selectedUmamusume()?.early_foot_aptitude" />
-              <app-aptitude-badge name="差し" [aptitude]="selectedUmamusume()?.midfield_aptitude" />
-              <app-aptitude-badge name="追込" [aptitude]="selectedUmamusume()?.closer_aptitude" />
+
+            <!-- 距離適性 -->
+            <div class="flex items-stretch gap-1.5">
+              <div class="text-xs font-bold text-gray-500 w-10 flex-shrink-0 flex items-center">距離</div>
+              <div class="flex gap-1 flex-1">
+                <div class="flex flex-col items-center px-1 py-1 rounded-lg flex-1 bg-gray-100 border border-gray-200 gap-0.5">
+                  <span class="text-xs font-semibold text-gray-600">短</span>
+                  <span class="text-sm font-black" [class]="gradeColor(selectedUmamusume()?.sprint_aptitude ?? '')">{{ selectedUmamusume()?.sprint_aptitude || '-' }}</span>
+                </div>
+                <div class="flex flex-col items-center px-1 py-1 rounded-lg flex-1 bg-gray-100 border border-gray-200 gap-0.5">
+                  <span class="text-xs font-semibold text-gray-600">マイ</span>
+                  <span class="text-sm font-black" [class]="gradeColor(selectedUmamusume()?.mile_aptitude ?? '')">{{ selectedUmamusume()?.mile_aptitude || '-' }}</span>
+                </div>
+                <div class="flex flex-col items-center px-1 py-1 rounded-lg flex-1 bg-gray-100 border border-gray-200 gap-0.5">
+                  <span class="text-xs font-semibold text-gray-600">中</span>
+                  <span class="text-sm font-black" [class]="gradeColor(selectedUmamusume()?.classic_aptitude ?? '')">{{ selectedUmamusume()?.classic_aptitude || '-' }}</span>
+                </div>
+                <div class="flex flex-col items-center px-1 py-1 rounded-lg flex-1 bg-gray-100 border border-gray-200 gap-0.5">
+                  <span class="text-xs font-semibold text-gray-600">長</span>
+                  <span class="text-sm font-black" [class]="gradeColor(selectedUmamusume()?.long_distance_aptitude ?? '')">{{ selectedUmamusume()?.long_distance_aptitude || '-' }}</span>
+                </div>
+              </div>
             </div>
+
+            <!-- 脚質適性 -->
+            <div class="flex items-stretch gap-1.5">
+              <div class="text-xs font-bold text-gray-500 w-10 flex-shrink-0 flex items-center">脚質</div>
+              <div class="flex gap-1 flex-1">
+                <div class="flex flex-col items-center px-1 py-1 rounded-lg flex-1 bg-gray-100 border border-gray-200 gap-0.5">
+                  <span class="text-xs font-semibold text-gray-600">逃げ</span>
+                  <span class="text-sm font-black" [class]="gradeColor(selectedUmamusume()?.front_runner_aptitude ?? '')">{{ selectedUmamusume()?.front_runner_aptitude || '-' }}</span>
+                </div>
+                <div class="flex flex-col items-center px-1 py-1 rounded-lg flex-1 bg-gray-100 border border-gray-200 gap-0.5">
+                  <span class="text-xs font-semibold text-gray-600">先行</span>
+                  <span class="text-sm font-black" [class]="gradeColor(selectedUmamusume()?.early_foot_aptitude ?? '')">{{ selectedUmamusume()?.early_foot_aptitude || '-' }}</span>
+                </div>
+                <div class="flex flex-col items-center px-1 py-1 rounded-lg flex-1 bg-gray-100 border border-gray-200 gap-0.5">
+                  <span class="text-xs font-semibold text-gray-600">差し</span>
+                  <span class="text-sm font-black" [class]="gradeColor(selectedUmamusume()?.midfield_aptitude ?? '')">{{ selectedUmamusume()?.midfield_aptitude || '-' }}</span>
+                </div>
+                <div class="flex flex-col items-center px-1 py-1 rounded-lg flex-1 bg-gray-100 border border-gray-200 gap-0.5">
+                  <span class="text-xs font-semibold text-gray-600">追込</span>
+                  <span class="text-sm font-black" [class]="gradeColor(selectedUmamusume()?.closer_aptitude ?? '')">{{ selectedUmamusume()?.closer_aptitude || '-' }}</span>
+                </div>
+              </div>
+            </div>
+
           </div>
+
         </div>
       </div>
 
       <!-- 右パネル: タブ + レースグリッド + ボタン -->
-      <div class="flex-1 flex flex-col overflow-hidden">
+      <div class="flex-1 flex flex-col overflow-hidden min-h-0">
 
         <!-- タブ -->
         <div class="flex gap-1 px-4 pt-3 flex-shrink-0">
@@ -99,7 +138,7 @@ const PAGE_SIZE = 15;
         </div>
 
         <!-- レースグリッド + 矢印ナビ -->
-        <div class="flex-1 flex items-stretch overflow-hidden px-1 py-2 bg-black/20 min-h-0">
+        <div class="flex-1 flex items-stretch overflow-hidden px-1 py-2 bg-black/40 md:bg-black/20 min-h-0">
 
           <!-- 左矢印 -->
           <button
@@ -144,8 +183,8 @@ const PAGE_SIZE = 15;
                     ✓
                   </div>
                 }
-                <!-- レース名 -->
-                <div class="text-white text-xs text-center font-semibold py-0.5 px-1 bg-black/60 truncate flex-shrink-0">
+                <!-- レース名 (スマホでは非表示) -->
+                <div class="hidden md:block text-white text-xs text-center font-semibold py-0.5 px-1 bg-black/60 truncate flex-shrink-0">
                   {{ race.race_name }}
                 </div>
               </div>
@@ -211,6 +250,8 @@ export class CharacterRegistComponent implements OnInit {
   private readonly raceService = inject(RaceService);
   private readonly navService = inject(NavigationService);
   private readonly toastService = inject(ToastService);
+
+  readonly gradeColor = gradeColor;
 
   /** 未登録ウマ娘の一覧 */
   umamusumes = signal<Umamusume[]>([]);

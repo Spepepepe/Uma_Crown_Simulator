@@ -37,7 +37,7 @@ import { RemainingRacePatternComponent } from './features/remaining-race/remaini
     } @else {
       <div class="flex h-screen">
         <app-sidebar />
-        <main class="flex-1 overflow-auto">
+        <main class="flex-1 overflow-auto pt-10 md:pt-0">
           @switch (navService.currentView().page) {
             @case ('character-list') {
               <app-character-list />
