@@ -1,13 +1,11 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service.js';
-import { BreedingCountService } from './breeding-count.service.js';
 
 /** レース関連のビジネスロジックを提供するサービス */
 @Injectable()
 export class RaceService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly breedingCountService: BreedingCountService,
   ) {}
 
   /** レース一覧取得 (フィルタ付き)
@@ -88,7 +86,6 @@ export class RaceService {
       );
       const isAllCrown = remainingRaces.length === 0;
 
-      let breedingCount = 0;
       const counts = {
         allCrownRace: 0,
         turfSprintRace: 0,
@@ -101,8 +98,6 @@ export class RaceService {
       };
 
       if (!isAllCrown) {
-        breedingCount = this.breedingCountService.calculate(remainingRaces);
-
         counts.allCrownRace = remainingRaces.length;
         for (const race of remainingRaces) {
           if (race.race_state === 0 && race.distance === 1)
@@ -125,7 +120,6 @@ export class RaceService {
       results.push({
         umamusume: regist.umamusume,
         isAllCrown,
-        breedingCount,
         ...counts,
       });
     }

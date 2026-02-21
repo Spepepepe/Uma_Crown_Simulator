@@ -1,5 +1,4 @@
 import { RaceService } from '../../../src/race/race.service';
-import { BreedingCountService } from '../../../src/race/breeding-count.service';
 import type { RaceRow } from '@uma-crown/shared';
 
 /**
@@ -40,7 +39,6 @@ function makeUmamusume(overrides: any = {}) {
 describe('RaceService', () => {
   let service: RaceService;
   let mockPrisma: any;
-  let mockBreedingCountService: jest.Mocked<BreedingCountService>;
 
   beforeEach(() => {
     mockPrisma = {
@@ -59,12 +57,7 @@ describe('RaceService', () => {
       },
     };
 
-    mockBreedingCountService = {
-      calculate: jest.fn(),
-      calculateAsync: jest.fn(),
-    } as any;
-
-    service = new RaceService(mockPrisma, mockBreedingCountService);
+    service = new RaceService(mockPrisma);
   });
 
   // ─────────────────────────────────────────────
@@ -164,7 +157,6 @@ describe('RaceService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].isAllCrown).toBe(true);
-      expect(result[0].breedingCount).toBe(0);
       expect(result[0].allCrownRace).toBe(0);
     });
 
@@ -180,7 +172,6 @@ describe('RaceService', () => {
       ];
       mockPrisma.raceTable.findMany.mockResolvedValue(targetRaces);
       mockPrisma.registUmamusumeRaceTable.findMany.mockResolvedValue([]);
-      mockBreedingCountService.calculate.mockReturnValue(2);
 
       const result = await service.getRemaining(userId);
 
@@ -189,8 +180,6 @@ describe('RaceService', () => {
       expect(result[0].allCrownRace).toBe(2);
       expect(result[0].turfClassicRace).toBe(1);
       expect(result[0].dirtMileRace).toBe(1);
-      expect(result[0].breedingCount).toBe(2);
-      expect(mockBreedingCountService.calculate).toHaveBeenCalledWith(targetRaces);
     });
 
     it('複数ウマ娘が存在する場合 → allCrownRace昇順でソートされる', async () => {
@@ -214,7 +203,6 @@ describe('RaceService', () => {
         { umamusume_id: 2, race_id: 101 },
         { umamusume_id: 2, race_id: 102 },
       ]);
-      mockBreedingCountService.calculate.mockReturnValue(1);
 
       const result = await service.getRemaining(userId);
 

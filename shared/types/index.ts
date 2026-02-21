@@ -46,7 +46,6 @@ export interface Race {
 export interface RemainingRace {
   umamusume: Umamusume;
   isAllCrown: boolean;
-  breedingCount: number;
   allCrownRace: number;
   turfSprintRace: number;
   turfMileRace: number;
