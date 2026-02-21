@@ -1,5 +1,5 @@
 import { RaceService } from '../../../src/race/race.service';
-import type { RaceRow } from '@uma-crown/shared';
+import type { RaceRow } from '../../../src/race/race.types';
 
 /**
  * 対象: src/race/race.service.ts

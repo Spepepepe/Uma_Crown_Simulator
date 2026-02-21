@@ -1,13 +1,13 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service.js';
+import type { GradeName } from '@uma-crown/shared';
 import type {
   RaceRow,
   ScenarioRaceRow,
   UmamusumeRow,
   RaceSlotData,
   PatternData,
-  GradeName,
-} from '@uma-crown/shared';
+} from './race.types.js';
 
 /** 適性ランク文字列→スコアのマッピング */
 const APTITUDE_MAP: Record<string, number> = {
@@ -708,14 +708,7 @@ export class RacePatternService {
       include: { race: true },
     });
 
-    const scenarioRaces: ScenarioRaceRow[] = scenarioRacesRaw.map((sr) => ({
-      umamusume_id: sr.umamusume_id,
-      race_id: sr.race_id,
-      race_number: sr.race_number,
-      random_group: sr.random_group,
-      senior_flag: sr.senior_flag,
-      race: sr.race,
-    }));
+    const scenarioRaces: ScenarioRaceRow[] = scenarioRacesRaw;
 
     // 2. 事前準備
     const strategies = getReinforcementStrategies(umaData, remainingRacesAll);
