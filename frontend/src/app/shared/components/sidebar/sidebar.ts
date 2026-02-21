@@ -27,7 +27,7 @@ const sidebarItems: SidebarItem[] = [
   standalone: true,
   imports: [],
   template: `
-    <nav class="w-64 min-h-screen bg-white/70 backdrop-blur-sm border-r border-gray-200 p-4 flex flex-col">
+    <nav class="w-64 h-full bg-white/70 backdrop-blur-sm border-r border-gray-200 p-4 flex flex-col">
       <h2 class="text-lg font-bold text-purple-600 mb-6 text-center">Uma Crown Simulator</h2>
 
       <ul class="flex-1 space-y-4">

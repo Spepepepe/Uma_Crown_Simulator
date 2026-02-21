@@ -16,18 +16,18 @@ export class RaceService {
    * @returns フィルタされたレース一覧
    */
   async getRaceList(state: number, distance: number) {
-    const where: any = {};
+    const where: any = { race_rank: { in: [1, 2, 3] } };
     if (state !== -1) where.race_state = state;
     if (distance !== -1) where.distance = distance;
 
     return this.prisma.raceTable.findMany({
       where,
       orderBy: [
+        { race_rank: 'asc' },
         { junior_flag: 'desc' },
         { classic_flag: 'desc' },
         { race_months: 'asc' },
         { half_flag: 'asc' },
-        { race_rank: 'asc' },
       ],
     });
   }
