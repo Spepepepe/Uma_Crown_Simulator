@@ -57,9 +57,13 @@ kubectl apply -f k8s/ingress.yaml
 
 echo "  マニフェスト適用完了!"
 
-# --- Step 3: デプロイ完了待ち ---
+# --- Step 3: Pod 再起動・デプロイ完了待ち ---
+# imagePullPolicy: Never のローカルイメージ運用では YAML が変わらなくても
+# rollout restart しないと新イメージが反映されないため、毎回強制再起動する
 echo ""
-echo "[3/3] デプロイ完了を待機中..."
+echo "[3/3] Pod を再起動してデプロイ完了を待機中..."
+kubectl rollout restart deployment/backend -n uma-crown
+kubectl rollout restart deployment/frontend -n uma-crown
 kubectl rollout status deployment/backend -n uma-crown --timeout=120s
 kubectl rollout status deployment/frontend -n uma-crown --timeout=120s
 
