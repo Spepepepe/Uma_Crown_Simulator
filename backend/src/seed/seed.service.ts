@@ -1,5 +1,6 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '@common/prisma/prisma.service.js';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -9,28 +10,29 @@ const BATCH_SIZE = 100;
 /** アプリ起動時にマスタデータをDBへ投入するサービス */
 @Injectable()
 export class SeedService implements OnModuleInit {
-  private readonly logger = new Logger(SeedService.name);
-
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectPinoLogger(SeedService.name) private readonly logger: PinoLogger,
+  ) {}
 
   /** モジュール初期化時にDBが空であればシードデータを投入する */
   async onModuleInit() {
     const count = await this.prisma.umamusumeTable.count();
     if (count === 0) {
-      this.logger.log('データベースが空です。シードデータを投入します...');
+      this.logger.info('データベースが空です。シードデータを投入します...');
       await this.seedAll();
     } else {
-      this.logger.log(`既にデータが存在します (${count} 件)。シードをスキップします。`);
+      this.logger.info(`既にデータが存在します (${count} 件)。シードをスキップします。`);
     }
   }
 
   /** 全マスタデータ（ウマ娘・レース・シナリオレース）を順番に投入する */
   async seedAll() {
-    this.logger.log('データ投入を開始します...');
+    this.logger.info('データ投入を開始します...');
     await this.seedUmamusume();
     await this.seedRaces();
     await this.seedScenarioRaces();
-    this.logger.log('データ投入が完了しました');
+    this.logger.info('データ投入が完了しました');
   }
 
   /** Umamusume.json からウマ娘マスタデータをDBに投入する */
@@ -61,7 +63,7 @@ export class SeedService implements OnModuleInit {
       await this.prisma.umamusumeTable.createMany({ data: batch });
       inserted += batch.length;
     }
-    this.logger.log(`umamusume_table: ${inserted} 件を投入しました`);
+    this.logger.info(`umamusume_table: ${inserted} 件を投入しました`);
   }
 
   /** Race.json からレースマスタデータをDBに投入する */
@@ -93,7 +95,7 @@ export class SeedService implements OnModuleInit {
       await this.prisma.raceTable.createMany({ data: batch });
       inserted += batch.length;
     }
-    this.logger.log(`race_table: ${inserted} 件を投入しました`);
+    this.logger.info(`race_table: ${inserted} 件を投入しました`);
   }
 
   /** Umamusume.json のシナリオ情報からシナリオレースデータをDBに投入する */
@@ -140,7 +142,7 @@ export class SeedService implements OnModuleInit {
         await this.prisma.scenarioRaceTable.createMany({ data: batch });
         inserted += batch.length;
       }
-      this.logger.log(`scenario_race_table: ${inserted} 件を投入しました`);
+      this.logger.info(`scenario_race_table: ${inserted} 件を投入しました`);
     }
   }
 

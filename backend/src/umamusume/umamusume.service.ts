@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/prisma/prisma.service.js';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 /** ウマ娘の登録・取得に関するビジネスロジックを提供するサービス */
 @Injectable()
 export class UmamusumeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectPinoLogger(UmamusumeService.name) private readonly logger: PinoLogger,
+  ) {}
 
   /** 全ウマ娘を取得
    * @returns ウマ娘一覧（ID昇順）
@@ -77,6 +81,7 @@ export class UmamusumeService {
       });
     }
 
+    this.logger.info({ userId, umamusumeId, initialRaceCount: raceIdArray.length }, 'ウマ娘を登録しました');
     return { message: 'ウマ娘を登録しました' };
   }
 

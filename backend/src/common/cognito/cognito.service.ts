@@ -1,13 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 /** AWS CognitoのJWTトークン検証を行うサービス */
 @Injectable()
 export class CognitoService {
-  private readonly logger = new Logger(CognitoService.name);
   private readonly verifier: ReturnType<typeof CognitoJwtVerifier.create>;
 
-  constructor() {
+  constructor(@InjectPinoLogger(CognitoService.name) private readonly logger: PinoLogger) {
     const userPoolId = process.env.COGNITO_USER_POOL_ID;
     const clientId = process.env.COGNITO_CLIENT_ID;
 
@@ -31,7 +31,7 @@ export class CognitoService {
       const payload = await this.verifier.verify(token);
       return payload.sub;
     } catch (error) {
-      this.logger.debug(`Token verification failed: ${error}`);
+      this.logger.debug({ err: error }, 'Token verification failed');
       return null;
     }
   }

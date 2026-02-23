@@ -9,11 +9,13 @@ import { UmamusumeModule } from './umamusume/umamusume.module.js';
 import { RaceModule } from './race/race.module.js';
 import { SeedModule } from './seed/seed.module.js';
 import { HealthModule } from './health/health.module.js';
+import { LoggerModule } from '@common/logger/logger.module.js';
 import { resolve } from 'path';
 
 /** アプリケーション全体のルートモジュール。グローバルガード・設定・各機能モジュールを登録する */
 @Module({
   imports: [
+    LoggerModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: resolve(process.cwd(), '..', '.env'),

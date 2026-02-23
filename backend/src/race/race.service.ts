@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@common/prisma/prisma.service.js';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 /** レース関連のビジネスロジックを提供するサービス */
 @Injectable()
 export class RaceService {
   constructor(
     private readonly prisma: PrismaService,
+    @InjectPinoLogger(RaceService.name) private readonly logger: PinoLogger,
   ) {}
 
   /** レース一覧取得 (フィルタ付き)
@@ -225,6 +227,7 @@ export class RaceService {
     });
 
     if (existing) {
+      this.logger.debug({ userId, umamusumeId, raceId, raceName }, '出走登録スキップ: 既に出走済み');
       return { message: `${raceName}は既に出走済みです。` };
     }
 
@@ -232,6 +235,7 @@ export class RaceService {
       data: { user_id: userId, umamusume_id: umamusumeId, race_id: raceId },
     });
 
+    this.logger.info({ userId, umamusumeId, raceId, raceName }, '出走登録完了');
     return { message: `${raceName}を出走登録しました。` };
   }
 
@@ -246,6 +250,7 @@ export class RaceService {
       data: { user_id: userId, umamusume_id: umamusumeId, race_id: raceId },
     });
 
+    this.logger.info({ userId, umamusumeId, raceId }, '出走完了');
     return { message: '出走完了' };
   }
 
@@ -264,6 +269,7 @@ export class RaceService {
         race_id: race.race_id,
       }));
 
+    this.logger.info({ userId, umamusumeId, count: records.length }, 'パターン一括登録');
     await this.prisma.registUmamusumeRaceTable.createMany({
       data: records,
       skipDuplicates: true,

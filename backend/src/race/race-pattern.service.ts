@@ -1,5 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '@common/prisma/prisma.service.js';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { GradeName } from '@uma-crown/shared';
 import type {
   RaceRow,
@@ -449,7 +450,10 @@ function calculateFactorComposition(
  */
 @Injectable()
 export class RacePatternService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectPinoLogger(RacePatternService.name) private readonly logger: PinoLogger,
+  ) {}
 
   /**
    * 指定ウマ娘の残レースから育成ローテーションパターン一覧を生成する
@@ -464,12 +468,17 @@ export class RacePatternService {
    * @throws {InternalServerErrorException} 登録ウマ娘が見つからない場合
    */
   async getRacePattern(userId: string, umamusumeId: number) {
+    this.logger.info({ userId, umamusumeId }, 'パターン生成開始');
+
     // --- Phase 1: データ取得 ---
     const registData = await this.prisma.registUmamusumeTable.findUnique({
       where: { user_id_umamusume_id: { user_id: userId, umamusume_id: umamusumeId } },
       include: { umamusume: true },
     });
-    if (!registData) throw new InternalServerErrorException('登録ウマ娘が見つかりません');
+    if (!registData) {
+      this.logger.error({ userId, umamusumeId }, '登録ウマ娘が見つかりません');
+      throw new InternalServerErrorException('登録ウマ娘が見つかりません');
+    }
     const umaData: UmamusumeRow = registData.umamusume;
 
     const registRaceRows = await this.prisma.registUmamusumeRaceTable.findMany({
@@ -488,6 +497,11 @@ export class RacePatternService {
       include: { race: true },
     });
     const scenarioRaces: ScenarioRaceRow[] = scenarioRacesRaw;
+
+    this.logger.debug(
+      { umamusumeName: umaData.umamusume_name, remainingCount: remainingRacesAll.length, scenarioCount: scenarioRaces.length },
+      'Phase 1 完了: データ取得',
+    );
 
     if (remainingRacesAll.length === 0) {
       return { patterns: [], umamusumeName: umaData.umamusume_name };
@@ -522,6 +536,11 @@ export class RacePatternService {
     // 伝説パターン: index 0（hasScenario のとき）
     // ラーク候補パターン: メイクラ先頭（hasScenario ? 1 : 0）
     const larcPatternIndex = hasRemainingLarc ? (hasScenario ? 1 : 0) : -1;
+
+    this.logger.debug(
+      { nMakera, nTotal, hasScenario, hasRemainingLarc },
+      'Phase 3 完了: パターン数決定',
+    );
 
     // 因子戦略の割り当て（伝説パターンは null 固定、メイクラは循環）
     const strategies = getReinforcementStrategies(umaData, remainingRacesAll);
@@ -591,7 +610,10 @@ export class RacePatternService {
         }
       }
 
-      if (candidates.length === 0) continue; // 収まらない場合はスキップ
+      if (candidates.length === 0) {
+        this.logger.debug({ raceName: race.race_name }, 'Phase 6: 候補スロットなし、スキップ');
+        continue;
+      }
 
       candidates.sort((a, b) => b.score - a.score);
       const best = candidates[0];
@@ -650,8 +672,10 @@ export class RacePatternService {
           }
         }
         larcPattern.scenario = 'ラーク';
+        this.logger.info({ umamusumeId }, 'Phase 8: ラーク確定');
       } else {
         larcPattern.scenario = 'メイクラ';
+        this.logger.info({ umamusumeId }, 'Phase 8: ラーク不成立、メイクラに変更');
 
         // --- Phase 8b: ラーク失敗時 — 専用レースを他パターンに救済配置 ---
         const orphanRaces = remainingRacesAll.filter((r) => LARC_EXCLUSIVE_NAMES.has(r.race_name));
@@ -693,6 +717,11 @@ export class RacePatternService {
 
     // レースが1件もないパターンは除外（余分なパターン数を抑制）
     const finalPatterns = patterns.filter((p) => (p.totalRaces ?? 0) > 0);
+
+    this.logger.info(
+      { umamusumeName: umaData.umamusume_name, patternCount: finalPatterns.length },
+      'パターン生成完了',
+    );
     return { patterns: finalPatterns, umamusumeName: umaData.umamusume_name };
   }
 }

@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { CognitoService } from '@common/cognito/cognito.service.js';
 import { IS_PUBLIC_KEY } from '@common/decorators/public.decorator.js';
 
@@ -12,6 +13,7 @@ import { IS_PUBLIC_KEY } from '@common/decorators/public.decorator.js';
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
+    @InjectPinoLogger(AuthGuard.name) private readonly logger: PinoLogger,
     private readonly cognitoService: CognitoService,
     private readonly reflector: Reflector,
   ) {}
@@ -31,6 +33,7 @@ export class AuthGuard implements CanActivate {
     const authHeader = request.headers['authorization'];
 
     if (!authHeader?.startsWith('Bearer ')) {
+      this.logger.warn({ method: request.method, path: request.path }, '認証トークンがありません');
       throw new UnauthorizedException('認証トークンがありません');
     }
 
@@ -38,6 +41,7 @@ export class AuthGuard implements CanActivate {
     const userId = await this.cognitoService.verifyToken(token);
 
     if (!userId) {
+      this.logger.warn({ method: request.method, path: request.path }, '無効なトークンです');
       throw new UnauthorizedException('無効なトークンです');
     }
 
