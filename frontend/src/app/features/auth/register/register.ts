@@ -23,6 +23,7 @@ import { NavigationService } from '@core/services/navigation.service';
                 type="email"
                 [(ngModel)]="email"
                 name="email"
+                autocomplete="email"
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="email@example.com"
               />
@@ -34,6 +35,7 @@ import { NavigationService } from '@core/services/navigation.service';
                 type="password"
                 [(ngModel)]="password"
                 name="password"
+                autocomplete="new-password"
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="パスワードを入力"
               />
@@ -73,6 +75,7 @@ import { NavigationService } from '@core/services/navigation.service';
                 type="text"
                 [(ngModel)]="confirmCode"
                 name="confirmCode"
+                autocomplete="one-time-code"
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-center text-2xl tracking-widest"
                 placeholder="123456"
                 maxlength="6"

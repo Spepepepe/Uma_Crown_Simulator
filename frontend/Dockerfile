@@ -28,6 +28,11 @@ CMD ["npx", "ng", "serve", "--host", "0.0.0.0"]
 # ============================================
 FROM node:20-alpine AS build
 
+# k8s ローカル検証時に --build-arg で Cognito 値を注入する
+# GitHub Actions (AWS本番) はこのステージを使わず S3 に sync するため影響なし
+ARG COGNITO_USER_POOL_ID
+ARG COGNITO_CLIENT_ID
+
 WORKDIR /app
 
 COPY shared/ ./shared/
@@ -40,6 +45,14 @@ RUN sed -i 's|"@uma-crown/shared": "\*"|"@uma-crown/shared": "file:../shared"|' 
     npm install
 
 COPY frontend/ /app/frontend/
+
+# Cognito 設定を environment.ts に注入（--build-arg 指定時のみ有効）
+RUN if [ -n "$COGNITO_USER_POOL_ID" ]; then \
+      sed -i "s|userPoolId: ''|userPoolId: '${COGNITO_USER_POOL_ID}'|g" src/app/environments/environment.ts; \
+    fi && \
+    if [ -n "$COGNITO_CLIENT_ID" ]; then \
+      sed -i "s|clientId: ''|clientId: '${COGNITO_CLIENT_ID}'|g" src/app/environments/environment.ts; \
+    fi
 
 RUN npx @tailwindcss/cli -i src/styles.css -o src/styles.built.css && \
     mv src/styles.built.css src/styles.css && \
