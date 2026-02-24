@@ -13,12 +13,13 @@ import { NavigationService } from '@core/services/navigation.service';
       <div class="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-8 w-full max-w-md">
         <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">ログイン</h1>
 
-        <div class="space-y-4">
+        <form class="space-y-4" (ngSubmit)="onLogin()">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
             <input
               type="email"
               [(ngModel)]="email"
+              name="email"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="email@example.com"
             />
@@ -29,6 +30,7 @@ import { NavigationService } from '@core/services/navigation.service';
             <input
               type="password"
               [(ngModel)]="password"
+              name="password"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="パスワードを入力"
             />
@@ -39,7 +41,7 @@ import { NavigationService } from '@core/services/navigation.service';
           }
 
           <button
-            (click)="onLogin()"
+            type="submit"
             [disabled]="loading()"
             class="w-full py-3 bg-blue-500 text-white font-bold rounded-lg hover:bg-blue-600 transition disabled:opacity-50 cursor-pointer"
           >
@@ -48,13 +50,14 @@ import { NavigationService } from '@core/services/navigation.service';
 
           <div class="text-center mt-4">
             <button
+              type="button"
               (click)="navService.navigate({ page: 'register' })"
               class="text-blue-500 hover:underline text-sm cursor-pointer"
             >
               新規登録
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   `,

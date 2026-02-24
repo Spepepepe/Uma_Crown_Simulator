@@ -16,12 +16,13 @@ import { NavigationService } from '@core/services/navigation.service';
           <!-- Step 1: 新規登録 -->
           <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">新規登録</h1>
 
-          <div class="space-y-4">
+          <form class="space-y-4" (ngSubmit)="onRegister()">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
               <input
                 type="email"
                 [(ngModel)]="email"
+                name="email"
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="email@example.com"
               />
@@ -32,6 +33,7 @@ import { NavigationService } from '@core/services/navigation.service';
               <input
                 type="password"
                 [(ngModel)]="password"
+                name="password"
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="パスワードを入力"
               />
@@ -42,7 +44,7 @@ import { NavigationService } from '@core/services/navigation.service';
             }
 
             <button
-              (click)="onRegister()"
+              type="submit"
               [disabled]="loading()"
               class="w-full py-3 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition disabled:opacity-50 cursor-pointer"
             >
@@ -50,12 +52,13 @@ import { NavigationService } from '@core/services/navigation.service';
             </button>
 
             <button
+              type="button"
               (click)="navService.navigate({ page: 'login' })"
               class="w-full py-3 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition cursor-pointer"
             >
               戻る
             </button>
-          </div>
+          </form>
         } @else {
           <!-- Step 2: 確認コード入力 -->
           <h1 class="text-2xl font-bold text-center text-gray-800 mb-4">メール確認</h1>
@@ -63,12 +66,13 @@ import { NavigationService } from '@core/services/navigation.service';
             {{ email }} に確認コードを送信しました。<br />メールに記載された6桁のコードを入力してください。
           </p>
 
-          <div class="space-y-4">
+          <form class="space-y-4" (ngSubmit)="onConfirm()">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">確認コード</label>
               <input
                 type="text"
                 [(ngModel)]="confirmCode"
+                name="confirmCode"
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-center text-2xl tracking-widest"
                 placeholder="123456"
                 maxlength="6"
@@ -84,7 +88,7 @@ import { NavigationService } from '@core/services/navigation.service';
             }
 
             <button
-              (click)="onConfirm()"
+              type="submit"
               [disabled]="loading()"
               class="w-full py-3 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition disabled:opacity-50 cursor-pointer"
             >
@@ -92,6 +96,7 @@ import { NavigationService } from '@core/services/navigation.service';
             </button>
 
             <button
+              type="button"
               (click)="onResendCode()"
               [disabled]="loading()"
               class="w-full py-2 text-blue-500 hover:underline text-sm cursor-pointer disabled:opacity-50"
@@ -100,12 +105,13 @@ import { NavigationService } from '@core/services/navigation.service';
             </button>
 
             <button
+              type="button"
               (click)="showConfirm.set(false); errorMessage.set('')"
               class="w-full py-3 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition cursor-pointer"
             >
               戻る
             </button>
-          </div>
+          </form>
         }
 
       </div>
