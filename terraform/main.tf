@@ -46,34 +46,41 @@ module "networking" {
   az                = "${var.region}a"
 }
 
-module "management" {
-  source  = "./modules/management"
-  project = var.project
-  env     = var.env
-}
-
 module "auth" {
   source  = "./modules/auth"
   project = var.project
   env     = var.env
 }
 
+# auth より後に実行（Cognito ID を SSM に保存するため）
+module "management" {
+  source               = "./modules/management"
+  project              = var.project
+  env                  = var.env
+  region               = var.region
+  domain_name          = var.domain_name
+  cognito_user_pool_id = module.auth.user_pool_id
+  cognito_client_id    = module.auth.client_id
+}
+
 module "backend" {
-  source              = "./modules/backend"
-  project             = var.project
-  env                 = var.env
-  region              = var.region
-  subnet_id           = module.networking.public_subnet_id
-  security_group_id   = module.networking.ec2_security_group_id
-  instance_type       = var.ec2_instance_type
-  ebs_volume_size     = var.ebs_volume_size
-  log_group_name      = module.management.ecs_log_group_name
-  db_password_arn     = module.management.db_password_arn
-  db_name             = module.management.db_name_value
-  db_user             = module.management.db_user_value
-  cognito_user_pool_id   = module.auth.user_pool_id
-  cognito_client_id      = module.auth.client_id
-  eip_id                 = module.networking.eip_id
+  source                   = "./modules/backend"
+  project                  = var.project
+  env                      = var.env
+  region                   = var.region
+  subnet_id                = module.networking.public_subnet_id
+  security_group_id        = module.networking.ec2_security_group_id
+  instance_type            = var.ec2_instance_type
+  ebs_volume_size          = var.ebs_volume_size
+  log_group_name           = module.management.ecs_log_group_name
+  eip_id                   = module.networking.eip_id
+  db_password_arn          = module.management.db_password_arn
+  db_name_arn              = module.management.db_name_arn
+  db_user_arn              = module.management.db_user_arn
+  database_url_arn         = module.management.database_url_arn
+  cors_origin_arn          = module.management.cors_origin_arn
+  cognito_user_pool_id_arn = module.management.cognito_user_pool_id_arn
+  cognito_client_id_arn    = module.management.cognito_client_id_arn
 }
 
 # CloudFront origin 用バックエンド DNS レコード（IP アドレスは origin に使えないため）

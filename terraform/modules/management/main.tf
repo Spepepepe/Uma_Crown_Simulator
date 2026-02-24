@@ -48,3 +48,47 @@ resource "aws_ssm_parameter" "db_user" {
 
   tags = { Name = "${local.name}-db-user" }
 }
+
+# DATABASE_URL（Prisma 用。パスワードを含むため初回 apply 後に手動で更新）
+resource "aws_ssm_parameter" "database_url" {
+  name        = "${local.prefix}/database_url"
+  description = "Prisma 用 DATABASE_URL（初回 apply 後に実際の値へ更新）"
+  type        = "SecureString"
+  value       = "CHANGE_ME_AFTER_FIRST_APPLY"
+
+  tags = { Name = "${local.name}-database-url" }
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+# CORS_ORIGIN（本番ドメインを許可）
+resource "aws_ssm_parameter" "cors_origin" {
+  name        = "${local.prefix}/cors_origin"
+  description = "CORS 許可オリジン"
+  type        = "String"
+  value       = "https://${var.domain_name},https://www.${var.domain_name}"
+
+  tags = { Name = "${local.name}-cors-origin" }
+}
+
+# Cognito User Pool ID
+resource "aws_ssm_parameter" "cognito_user_pool_id" {
+  name        = "${local.prefix}/cognito_user_pool_id"
+  description = "Cognito ユーザープール ID"
+  type        = "String"
+  value       = var.cognito_user_pool_id
+
+  tags = { Name = "${local.name}-cognito-user-pool-id" }
+}
+
+# Cognito App Client ID
+resource "aws_ssm_parameter" "cognito_client_id" {
+  name        = "${local.prefix}/cognito_client_id"
+  description = "Cognito アプリクライアント ID"
+  type        = "String"
+  value       = var.cognito_client_id
+
+  tags = { Name = "${local.name}-cognito-client-id" }
+}

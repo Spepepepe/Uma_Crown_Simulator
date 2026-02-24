@@ -162,21 +162,22 @@ resource "aws_ecs_task_definition" "backend" {
     }]
 
     environment = [
-      { name = "NODE_ENV",              value = "production" },
-      { name = "PORT",                  value = "3000" },
-      { name = "AWS_REGION",            value = var.region },
-      { name = "COGNITO_USER_POOL_ID",  value = var.cognito_user_pool_id },
-      { name = "COGNITO_CLIENT_ID",     value = var.cognito_client_id },
-      { name = "DB_HOST",               value = "localhost" },
-      { name = "DB_PORT",               value = "5432" },
-      { name = "DB_NAME",               value = var.db_name },
-      { name = "DB_USER",               value = var.db_user },
+      { name = "NODE_ENV",   value = "production" },
+      { name = "PORT",       value = "3000" },
+      { name = "AWS_REGION", value = var.region },
+      { name = "DB_HOST",    value = "localhost" },
+      { name = "DB_PORT",    value = "5432" },
     ]
 
-    secrets = [{
-      name      = "DB_PASSWORD"
-      valueFrom = var.db_password_arn
-    }]
+    secrets = [
+      { name = "DB_PASSWORD",          valueFrom = var.db_password_arn },
+      { name = "DB_NAME",              valueFrom = var.db_name_arn },
+      { name = "DB_USER",              valueFrom = var.db_user_arn },
+      { name = "DATABASE_URL",         valueFrom = var.database_url_arn },
+      { name = "COGNITO_USER_POOL_ID", valueFrom = var.cognito_user_pool_id_arn },
+      { name = "COGNITO_CLIENT_ID",    valueFrom = var.cognito_client_id_arn },
+      { name = "CORS_ORIGIN",          valueFrom = var.cors_origin_arn },
+    ]
 
     logConfiguration = {
       logDriver = "awslogs"
@@ -235,8 +236,8 @@ resource "aws_instance" "main" {
     region          = var.region
     project         = var.project
     db_password_key = "/${var.project}/${var.env}/db_password"
-    db_name         = var.db_name
-    db_user         = var.db_user
+    db_name_key     = "/${var.project}/${var.env}/db_name"
+    db_user_key     = "/${var.project}/${var.env}/db_user"
   }))
 
   root_block_device {

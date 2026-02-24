@@ -39,10 +39,22 @@ echo "UUID=$UUID /data/postgres xfs defaults,nofail 0 2" >> /etc/fstab
 # ─────────────────────────────────────────
 # PostgreSQL コンテナ起動
 # ─────────────────────────────────────────
-# SSM から DB パスワードを取得
+# SSM から DB 接続情報を取得
 DB_PASSWORD=$(aws ssm get-parameter \
   --name "${db_password_key}" \
   --with-decryption \
+  --query Parameter.Value \
+  --output text \
+  --region ${region})
+
+DB_NAME=$(aws ssm get-parameter \
+  --name "${db_name_key}" \
+  --query Parameter.Value \
+  --output text \
+  --region ${region})
+
+DB_USER=$(aws ssm get-parameter \
+  --name "${db_user_key}" \
   --query Parameter.Value \
   --output text \
   --region ${region})
@@ -51,15 +63,15 @@ docker run -d \
   --name postgres \
   --restart unless-stopped \
   -e POSTGRES_PASSWORD="$DB_PASSWORD" \
-  -e POSTGRES_DB="${db_name}" \
-  -e POSTGRES_USER="${db_user}" \
+  -e POSTGRES_DB="$DB_NAME" \
+  -e POSTGRES_USER="$DB_USER" \
   -v /data/postgres:/var/lib/postgresql/data \
   -p 5432:5432 \
   postgres:16-alpine
 
 # PostgreSQL の起動を待機
 for i in $(seq 1 30); do
-  if docker exec postgres pg_isready -U ${db_user} &>/dev/null; then
+  if docker exec postgres pg_isready -U "$DB_USER" &>/dev/null; then
     break
   fi
   sleep 2

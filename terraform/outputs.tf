@@ -32,3 +32,13 @@ output "github_actions_role_arn" {
   description = "GitHub Actions が assume する IAM ロール ARN"
   value       = module.cicd.github_actions_role_arn
 }
+
+output "s3_bucket_name" {
+  description = "フロントエンド S3 バケット名"
+  value       = module.frontend.s3_bucket_name
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront ディストリビューション ID（GitHub Secret: CLOUDFRONT_DISTRIBUTION_ID に設定）"
+  value       = module.frontend.cloudfront_distribution_id
+}
