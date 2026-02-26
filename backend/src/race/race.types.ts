@@ -26,6 +26,16 @@ export interface RaceSlotData {
   half: boolean;
 }
 
+/** ウマ娘の現在適性状態（因子一段階につき G→F, F→E のように向上） */
+export interface AptitudeState {
+  turf: string;    // 芝適性 (S/A/B/C/D/E/F/G)
+  dirt: string;    // ダート適性
+  sprint: string;  // 短距離適性
+  mile: string;    // マイル適性
+  classic: string; // 中距離適性
+  long: string;    // 長距離適性
+}
+
 /** 育成パターンデータ */
 export interface PatternData {
   junior: RaceSlotData[];
@@ -33,6 +43,7 @@ export interface PatternData {
   senior: RaceSlotData[];
   scenario?: string;
   strategy?: Record<string, number> | null;
+  aptitudeState?: AptitudeState;
   factors?: string[];
   totalRaces?: number;
   surface?: string;
