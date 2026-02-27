@@ -438,6 +438,53 @@ function isRaceRunnable(race: RaceRow, aptState: AptitudeState): boolean {
   return getApt(aptState[surfKey]) >= 0 && getApt(aptState[distKey]) >= 0;
 }
 
+/**
+ * 適性不足のレースを因子スロットで補修して走れるようにする追加戦略を計算する
+ *
+ * 現在の因子戦略の空きスロット数（最大6から使用済みを引いた数）で
+ * D 適性（スコア=0）への到達が可能かを判定し、必要な追加因子を返す。
+ * 例: 長距離 G（スコア=-3）・空き3スロット → {'長距離': 3} を返し G→D に引き上げ
+ *
+ * @param race - 走れないレース
+ * @param aptState - 現在の適性状態（既存因子戦略適用済み）
+ * @param currentStrategy - 現在の因子戦略（null の場合は空き6スロット）
+ * @returns 補修に必要な追加因子マップ、補修不可の場合は null
+ */
+function calcRunnableEnhancement(
+  race: RaceRow,
+  aptState: AptitudeState,
+  currentStrategy: Record<string, number> | null,
+): Record<string, number> | null {
+  const surfKey: keyof AptitudeState = race.race_state === 0 ? 'turf' : 'dirt';
+  const distKeys: (keyof AptitudeState)[] = ['sprint', 'mile', 'classic', 'long'];
+  const distKey = distKeys[race.distance - 1];
+  const surfApt = getApt(aptState[surfKey]);
+  const distApt = getApt(aptState[distKey]);
+
+  // 既に走れる場合はこの関数を呼ぶべきではない
+  if (surfApt >= 0 && distApt >= 0) return null;
+
+  // 現在の戦略が使用しているスロット数
+  const usedSlots = currentStrategy
+    ? Object.values(currentStrategy).reduce((sum, v) => sum + v, 0)
+    : 0;
+  const freeSlots = 6 - usedSlots;
+  if (freeSlots <= 0) return null;
+
+  // D（スコア=0）に到達するために必要な因子数（G=3枚, F=2枚, E=1枚）
+  const surfNeeded = surfApt < 0 ? -surfApt : 0;
+  const distNeeded = distApt < 0 ? -distApt : 0;
+  if (surfNeeded + distNeeded > freeSlots) return null;
+
+  const enhancement: Record<string, number> = {};
+  if (surfNeeded > 0) enhancement[race.race_state === 0 ? '芝' : 'ダート'] = surfNeeded;
+  if (distNeeded > 0) {
+    const distName = DISTANCE_MAP[race.distance];
+    if (distName) enhancement[distName] = distNeeded;
+  }
+  return enhancement;
+}
+
 /** パターンのレース構成と適性から推奨因子構成を計算する */
 function calculateFactorComposition(
   uma: UmamusumeRow,
@@ -586,6 +633,7 @@ export class RacePatternService {
    * Phase 5: BC最終レースの適性を判断し、適性オブジェクトをパターンに設定
    * Phase 6: ジュニア7月頭から時系列で残レースを各パターンへ割り当て
    * Phase 7: ラークのレースが残レースに存在していればラークパターンを追加
+   * Phase 9: Phase 7 後に未割り当て残レースが存在すればオーバーフロー BC パターンを追加
    * Phase 8: 各パターン後処理（因子計算・主馬場距離集計）
    *
    * @param userId - 対象ユーザーの UUID
@@ -610,10 +658,6 @@ export class RacePatternService {
 
     this.logger.debug({ nBC, hasRemainingLarc }, 'Phase 2 完了: BC残レース数取得');
 
-    if (nBC === 0 && !hasRemainingLarc) {
-      return { patterns: [], umamusumeName: umaData.umamusume_name };
-    }
-
     // Phase 3-5
     const bcInit = this.initializeBCPatterns(
       umaData, remainingBCRaces, remainingRacesAll, hasRemainingLarc, scenarioRaces,
@@ -627,17 +671,37 @@ export class RacePatternService {
 
     // Phase 7
     const larcAptState = this.buildLarcAptitudeState(umaData);
+    let larcAssignedIds = new Set<number>();
     if (hasRemainingLarc) {
       const larcGrid = this.buildLarcGrid(
         racesToAssign, assignedRaceIds, remainingRacesAll, larcAptState, scenarioSlotSet,
       );
+      larcAssignedIds = new Set([...larcGrid.values()].map((r) => r.race_id));
       grid.push(larcGrid);
+      patternStrategies.push(null);
+      aptitudeStates.push(larcAptState);
       this.logger.info({ umamusumeId }, 'Phase 7 完了: ラークパターン追加');
+    }
+    const nLarc = hasRemainingLarc ? 1 : 0;
+
+    // Phase 9: Phase 7 後に未割り当て残レースがあればオーバーフロー BC パターンを追加
+    const allAssignedIds = new Set([...assignedRaceIds, ...larcAssignedIds]);
+    const remainingAfterPhase7 = racesToAssign.filter((r) => !allAssignedIds.has(r.race_id));
+    if (remainingAfterPhase7.length > 0) {
+      const overflowResults = this.buildOverflowPatterns(
+        remainingAfterPhase7, allGRaces, remainingRacesAll, umaData, scenarioSlotSet,
+      );
+      for (const { grid: og, strategy: os, aptState: oa } of overflowResults) {
+        grid.push(og);
+        patternStrategies.push(os);
+        aptitudeStates.push(oa);
+      }
+      this.logger.info({ overflowCount: overflowResults.length }, 'Phase 9 完了: オーバーフローパターン追加');
     }
 
     // Phase 8
     return this.buildAndFinalizePatterns(
-      grid, nBC, patternStrategies, aptitudeStates, larcAptState, umaData, allGRaces,
+      grid, nBC, nLarc, patternStrategies, aptitudeStates, larcAptState, umaData, allGRaces,
     );
   }
 
@@ -819,6 +883,7 @@ export class RacePatternService {
         pi: number;
         score: number;
         needsStrategySet: boolean;
+        enhancement: Record<string, number> | null;
       }[] = [];
 
       for (const race of candidateRaces) {
@@ -826,15 +891,22 @@ export class RacePatternService {
           if (grid[pi].has(slotK)) continue;
           if (isConsecutiveViolation(grid[pi], slotK, scenarioSlotSet)) continue;
 
-          // 馬場・距離適性が D 未満（E/F/G）では勝てないため候補から除外
-          if (!isRaceRunnable(race, aptitudeStates[pi])) continue;
+          // 馬場・距離適性が D 未満（E/F/G）の場合、因子補修で走れるようになるか確認
+          let enhancement: Record<string, number> | null = null;
+          if (!isRaceRunnable(race, aptitudeStates[pi])) {
+            enhancement = calcRunnableEnhancement(race, aptitudeStates[pi], patternStrategies[pi]);
+            if (!enhancement) continue; // 補修不可なら除外
+          }
 
           const matchesApt = raceMatchesAptitude(race, aptitudeStates[pi], sortedBCRaces[pi]);
           const isNullStrategy = patternStrategies[pi] === null;
           let score = 0;
           let needsStrategySet = false;
 
-          if (matchesApt) {
+          if (enhancement) {
+            // 因子補修でのみ走れるレース（空きスロットを消費して D 適性に引き上げ）
+            score += 1;
+          } else if (matchesApt) {
             score += 10; // 適性オブジェクトとのマッチ（最優先）
           } else if (isNullStrategy) {
             // 因子戦略が未決定のパターン → 吸収可能
@@ -851,7 +923,7 @@ export class RacePatternService {
           score -= getConsecutiveLength(grid[pi], slotK, scenarioSlotSet); // 連続出走ペナルティ
           score += (4 - race.race_rank); // G1=+3, G2=+2, G3=+1
 
-          candidates.push({ race, pi, score, needsStrategySet });
+          candidates.push({ race, pi, score, needsStrategySet, enhancement });
         }
       }
 
@@ -862,8 +934,18 @@ export class RacePatternService {
       const usedPatterns = new Set<number>();
       const usedRaces = new Set<number>();
 
+      /** 因子補修戦略を既存 strategy にマージして適性状態を更新する */
+      const applyEnhancement = (pi: number, enh: Record<string, number>) => {
+        const merged: Record<string, number> = { ...(patternStrategies[pi] ?? {}) };
+        for (const [key, val] of Object.entries(enh)) {
+          merged[key] = (merged[key] ?? 0) + val;
+        }
+        patternStrategies[pi] = merged;
+        aptitudeStates[pi] = applyStrategyToAptitude(buildAptitudeState(umaData), merged);
+      };
+
       // まずスコア > 0 の候補で割り当て（適性マッチ・因子戦略未決定パターン優先）
-      for (const { race, pi, score, needsStrategySet } of candidates) {
+      for (const { race, pi, score, needsStrategySet, enhancement } of candidates) {
         if (score <= 0) continue;
         if (usedPatterns.has(pi)) continue;
         if (usedRaces.has(race.race_id) || assignedRaceIds.has(race.race_id)) continue;
@@ -876,6 +958,7 @@ export class RacePatternService {
             aptitudeStates[pi] = applyStrategyToAptitude(buildAptitudeState(umaData), newStrategy);
           }
         }
+        if (enhancement) applyEnhancement(pi, enhancement);
 
         grid[pi].set(slotK, race);
         usedPatterns.add(pi);
@@ -884,9 +967,11 @@ export class RacePatternService {
       }
 
       // スコア > 0 で割り当てられなかったレースをフォールバック割り当て（最後の手段）
-      for (const { race, pi } of candidates) {
+      for (const { race, pi, enhancement } of candidates) {
         if (usedPatterns.has(pi)) continue;
         if (usedRaces.has(race.race_id) || assignedRaceIds.has(race.race_id)) continue;
+
+        if (enhancement) applyEnhancement(pi, enhancement);
 
         grid[pi].set(slotK, race);
         usedPatterns.add(pi);
@@ -955,11 +1040,96 @@ export class RacePatternService {
   }
 
   /**
+   * Phase 9: 未割り当て残レースをオーバーフロー BC パターンに割り当てる
+   *
+   * Phase 7 後に残ったレースを、全 BC 最終レースをテンプレートとして
+   * 残レースが最も多く走れるシナリオを順に選択し、パターンを追加する。
+   * 自然適性で走れる BC シナリオを優先し、残レースがなくなるまでループする。
+   */
+  private buildOverflowPatterns(
+    remainingRaces: RaceRow[],
+    allGRaces: RaceRow[],
+    remainingRacesAll: RaceRow[],
+    umaData: UmamusumeRow,
+    scenarioSlotSet: Set<string>,
+  ): { grid: Map<string, RaceRow>; strategy: Record<string, number> | null; aptState: AptitudeState }[] {
+    const results: { grid: Map<string, RaceRow>; strategy: Record<string, number> | null; aptState: AptitudeState }[] = [];
+    const allBCFinalRaces = allGRaces.filter((r) => r.bc_flag);
+    const usedBCTemplates = new Set<number>();
+    let remaining = [...remainingRaces];
+
+    while (remaining.length > 0) {
+      // 残レースに最も適した BC シナリオを選択（未使用テンプレートのみ）
+      let bestBC: RaceRow | null = null;
+      let bestStrategy: Record<string, number> | null = null;
+      let bestAptState: AptitudeState = buildAptitudeState(umaData);
+      let bestScore = -Infinity;
+
+      for (const bcRace of allBCFinalRaces) {
+        if (usedBCTemplates.has(bcRace.race_id)) continue;
+        const strategy = calcBCStrategy(bcRace, umaData);
+        const aptState = strategy
+          ? applyStrategyToAptitude(buildAptitudeState(umaData), strategy)
+          : buildAptitudeState(umaData);
+        // 自然適性で走れる BC シナリオを優先（+100）、走れる残レース数でスコア加算
+        const runnableCount = remaining.filter(
+          (r) => isRaceRunnable(r, aptState) || calcRunnableEnhancement(r, aptState, strategy) !== null,
+        ).length;
+        const score = (strategy === null ? 100 : 0) + runnableCount;
+        if (score > bestScore) {
+          bestScore = score;
+          bestBC = bcRace;
+          bestStrategy = strategy;
+          bestAptState = aptState;
+        }
+      }
+
+      if (!bestBC) break; // 全テンプレート使用済み
+
+      usedBCTemplates.add(bestBC.race_id);
+
+      // グリッドを生成し BC 最終レースを配置
+      const newGrid = new Map<string, RaceRow>();
+      const bcSlotKey = sk(BC_FINAL_SLOT.grade, BC_FINAL_SLOT.month, BC_FINAL_SLOT.half);
+      newGrid.set(bcSlotKey, bestBC);
+
+      // BC 必須中間レースを配置（未完走のもののみ）
+      for (const [grade, raceName, month, half] of BC_MANDATORY[bestBC.race_name] ?? []) {
+        const slotK = sk(grade, month, half);
+        if (newGrid.has(slotK)) continue;
+        const race = remainingRacesAll.find((r) => r.race_name === raceName);
+        if (race) newGrid.set(slotK, race);
+      }
+
+      // 残レースをこのグリッドに割り当て
+      const patternStrategiesLocal: (Record<string, number> | null)[] = [bestStrategy];
+      const aptitudeStatesLocal: AptitudeState[] = [bestAptState];
+      const newlyAssigned = this.assignRacesToBCGrids(
+        1, [bestBC], [newGrid], patternStrategiesLocal, aptitudeStatesLocal,
+        remaining, scenarioSlotSet, umaData,
+      );
+
+      if (newlyAssigned.size > 0) {
+        results.push({
+          grid: newGrid,
+          strategy: patternStrategiesLocal[0],
+          aptState: aptitudeStatesLocal[0],
+        });
+        remaining = remaining.filter((r) => !newlyAssigned.has(r.race_id));
+      }
+      // 0件割り当てでも usedBCTemplates に追加済みなので次のテンプレートへ
+    }
+
+    return results;
+  }
+
+  /**
    * Phase 8: グリッドから PatternData を構築し後処理（因子計算・主馬場距離集計）を実行する
    */
   private buildAndFinalizePatterns(
     grid: Map<string, RaceRow>[],
     nBC: number,
+    nLarc: number,
     patternStrategies: (Record<string, number> | null)[],
     aptitudeStates: AptitudeState[],
     larcAptState: AptitudeState,
@@ -969,13 +1139,20 @@ export class RacePatternService {
     const patterns: PatternData[] = grid.map((patternGrid, pi) => {
       const pattern = buildPatternFromGrid(patternGrid);
       if (pi < nBC) {
+        // BC パターン
         pattern.scenario = 'bc';
         pattern.strategy = patternStrategies[pi] ?? null;
         pattern.aptitudeState = aptitudeStates[pi];
-      } else {
+      } else if (pi < nBC + nLarc) {
+        // ラークパターン
         pattern.scenario = 'larc';
         pattern.strategy = null;
         pattern.aptitudeState = larcAptState;
+      } else {
+        // Phase 9 オーバーフロー BC パターン
+        pattern.scenario = 'bc';
+        pattern.strategy = patternStrategies[pi] ?? null;
+        pattern.aptitudeState = aptitudeStates[pi];
       }
       return pattern;
     });
