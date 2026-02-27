@@ -127,7 +127,7 @@ type CategoryKey = GradeName;
                   [class.opacity-40]="slot.first && (registeredRaceIds().has(slot.first.race_id) || isOutOfScope(slot.first))"
                   [style.background-color]="slot.first ? 'black' : '#9ca3af'"
                   [style.background-image]="slot.first && !isOutOfScope(slot.first) ? 'url(/image/raceData/' + slot.first.race_name + '.png)' : 'none'"
-                  style="background-size: contain; background-position: center; background-repeat: no-repeat; border: 1px solid #374151;"
+                  style="background-size: contain; background-position: center; background-repeat: no-repeat; background-origin: content-box; padding: 4px; border: 1px solid #374151;"
                 >
                   @if (!slot.first) {
                     <div class="text-gray-600 text-[10px] font-bold">未出走</div>
@@ -158,7 +158,7 @@ type CategoryKey = GradeName;
                   [class.opacity-40]="slot.second && (registeredRaceIds().has(slot.second.race_id) || isOutOfScope(slot.second))"
                   [style.background-color]="slot.second ? 'black' : '#9ca3af'"
                   [style.background-image]="slot.second && !isOutOfScope(slot.second) ? 'url(/image/raceData/' + slot.second.race_name + '.png)' : 'none'"
-                  style="background-size: contain; background-position: center; background-repeat: no-repeat; border: 1px solid #374151;"
+                  style="background-size: contain; background-position: center; background-repeat: no-repeat; background-origin: content-box; padding: 4px; border: 1px solid #374151;"
                 >
                   @if (!slot.second) {
                     <div class="text-gray-600 text-[10px] font-bold">未出走</div>
@@ -356,7 +356,7 @@ type CategoryKey = GradeName;
                       [class.opacity-40]="slot.first && (registeredRaceIds().has(slot.first.race_id) || isOutOfScope(slot.first))"
                       [style.background-color]="slot.first ? 'black' : '#9ca3af'"
                       [style.background-image]="slot.first && !isOutOfScope(slot.first) ? 'url(/image/raceData/' + slot.first.race_name + '.png)' : 'none'"
-                      style="background-size: contain; background-position: center; background-repeat: no-repeat; border: 1px solid #374151;"
+                      style="background-size: contain; background-position: center; background-repeat: no-repeat; background-origin: content-box; padding: 4px; border: 1px solid #374151;"
                     >
                       @if (!slot.first) {
                         <div class="text-gray-700 text-sm font-bold">未出走</div>
@@ -387,7 +387,7 @@ type CategoryKey = GradeName;
                       [class.opacity-40]="slot.second && (registeredRaceIds().has(slot.second.race_id) || isOutOfScope(slot.second))"
                       [style.background-color]="slot.second ? 'black' : '#9ca3af'"
                       [style.background-image]="slot.second && !isOutOfScope(slot.second) ? 'url(/image/raceData/' + slot.second.race_name + '.png)' : 'none'"
-                      style="background-size: contain; background-position: center; background-repeat: no-repeat; border: 1px solid #374151;"
+                      style="background-size: contain; background-position: center; background-repeat: no-repeat; background-origin: content-box; padding: 4px; border: 1px solid #374151;"
                     >
                       @if (!slot.second) {
                         <div class="text-gray-700 text-sm font-bold">未出走</div>
