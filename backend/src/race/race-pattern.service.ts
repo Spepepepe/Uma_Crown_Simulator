@@ -4,7 +4,6 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { GradeName } from '@uma-crown/shared';
 import type {
   RaceRow,
-  ScenarioRaceRow,
   UmamusumeRow,
   PatternData,
   AptitudeState,
@@ -153,23 +152,6 @@ function getApt(char: string): number {
  * @param scenarioInfo - シナリオ固定情報（通常レースの場合は省略可）
  * @returns 育成期カテゴリ ('junior' / 'classic' / 'senior')
  */
-function getRaceGrade(race: RaceRow, scenarioInfo?: ScenarioRaceRow | null): GradeName {
-  if (scenarioInfo) {
-    if (scenarioInfo.senior_flag == null) {
-      if (race.junior_flag) return 'junior';
-      if (race.classic_flag) return 'classic';
-      if (race.senior_flag) return 'senior';
-    } else if (scenarioInfo.senior_flag === false) {
-      return 'classic';
-    } else {
-      return 'senior';
-    }
-  }
-  if (race.classic_flag) return 'classic';
-  if (race.senior_flag) return 'senior';
-  return 'junior';
-}
-
 /** スロットキー文字列を生成する */
 function sk(grade: GradeName, month: number, half: boolean): string {
   return `${grade}|${month}|${half}`;
@@ -218,14 +200,10 @@ function isBCRestrictedSlot(grade: GradeName, month: number, half: boolean): boo
   return false;
 }
 
-/**
- * 指定スロットを含む連続出走長を返す（提案スロット含む）
- * シナリオレース（scenarioSlotSet）は連続カウントから除外する
- */
+/** 指定スロットを含む連続出走長を返す（提案スロット含む） */
 function getConsecutiveLength(
   patternGrid: Map<string, RaceRow>,
   proposedSk: string,
-  scenarioSlotSet: Set<string>,
 ): number {
   const idx = SLOT_INDEX_MAP.get(proposedSk);
   if (idx === undefined) return 1;
@@ -234,7 +212,7 @@ function getConsecutiveLength(
   let i = idx - 1;
   while (i >= 0) {
     const key = skFromIdx(i);
-    if (patternGrid.has(key) && !scenarioSlotSet.has(key)) { runStart = i; i--; }
+    if (patternGrid.has(key)) { runStart = i; i--; }
     else break;
   }
 
@@ -242,7 +220,7 @@ function getConsecutiveLength(
   i = idx + 1;
   while (i < ORDERED_SLOTS.length) {
     const key = skFromIdx(i);
-    if (patternGrid.has(key) && !scenarioSlotSet.has(key)) { runEnd = i; i++; }
+    if (patternGrid.has(key)) { runEnd = i; i++; }
     else break;
   }
 
@@ -253,9 +231,8 @@ function getConsecutiveLength(
 function isConsecutiveViolation(
   patternGrid: Map<string, RaceRow>,
   proposedSk: string,
-  scenarioSlotSet: Set<string>,
 ): boolean {
-  return getConsecutiveLength(patternGrid, proposedSk, scenarioSlotSet) >= 4;
+  return getConsecutiveLength(patternGrid, proposedSk) >= 4;
 }
 
 /** グリッドから PatternData を構築する（全スロットを出力） */
@@ -592,8 +569,6 @@ interface FetchedRaceData {
   umaData: UmamusumeRow;
   allGRaces: RaceRow[];
   remainingRacesAll: RaceRow[];
-  scenarioRaces: ScenarioRaceRow[];
-  scenarioSlotSet: Set<string>;
   hasRemainingLarc: boolean;
   registRaceIds: Set<number>;
 }
@@ -648,7 +623,7 @@ export class RacePatternService {
 
     // Phase 1
     const fetched = await this.fetchRaceData(userId, umamusumeId);
-    const { umaData, allGRaces, remainingRacesAll, scenarioRaces, scenarioSlotSet, hasRemainingLarc, registRaceIds } = fetched;
+    const { umaData, allGRaces, remainingRacesAll, hasRemainingLarc, registRaceIds } = fetched;
 
     if (remainingRacesAll.length === 0) {
       return { patterns: [], umamusumeName: umaData.umamusume_name };
@@ -662,13 +637,13 @@ export class RacePatternService {
 
     // Phase 3-5
     const bcInit = this.initializeBCPatterns(
-      umaData, remainingBCRaces, remainingRacesAll, hasRemainingLarc, scenarioRaces,
+      umaData, remainingBCRaces, remainingRacesAll, hasRemainingLarc,
     );
     const { sortedBCRaces, grid, patternStrategies, aptitudeStates, racesToAssign } = bcInit;
 
     // Phase 6
     const assignedRaceIds = this.assignRacesToBCGrids(
-      nBC, sortedBCRaces, grid, patternStrategies, aptitudeStates, racesToAssign, scenarioSlotSet, umaData,
+      nBC, sortedBCRaces, grid, patternStrategies, aptitudeStates, racesToAssign, umaData,
     );
 
     // Phase 7
@@ -676,7 +651,7 @@ export class RacePatternService {
     let larcAssignedIds = new Set<number>();
     if (hasRemainingLarc) {
       const larcGrid = this.buildLarcGrid(
-        racesToAssign, assignedRaceIds, remainingRacesAll, larcAptState, scenarioSlotSet,
+        racesToAssign, assignedRaceIds, remainingRacesAll, larcAptState,
       );
       larcAssignedIds = new Set([...larcGrid.values()].map((r) => r.race_id));
       grid.push(larcGrid);
@@ -691,7 +666,7 @@ export class RacePatternService {
     const remainingAfterPhase7 = racesToAssign.filter((r) => !allAssignedIds.has(r.race_id));
     if (remainingAfterPhase7.length > 0) {
       const overflowResults = this.buildOverflowPatterns(
-        remainingAfterPhase7, allGRaces, remainingRacesAll, umaData, scenarioSlotSet,
+        remainingAfterPhase7, allGRaces, remainingRacesAll, umaData,
       );
       for (const { grid: og, strategy: os, aptState: oa } of overflowResults) {
         grid.push(og);
@@ -742,30 +717,17 @@ export class RacePatternService {
     });
     const remainingRacesAll = allGRaces.filter((r) => !registRaceIds.has(r.race_id));
 
-    const scenarioRacesRaw = await this.prisma.scenarioRaceTable.findMany({
-      where: { umamusume_id: umamusumeId },
-      include: { race: true },
-    });
-    const scenarioRaces: ScenarioRaceRow[] = scenarioRacesRaw;
-
     this.logger.debug(
-      { umamusumeName: umaData.umamusume_name, remainingCount: remainingRacesAll.length, scenarioCount: scenarioRaces.length },
+      { umamusumeName: umaData.umamusume_name, remainingCount: remainingRacesAll.length },
       'Phase 1 完了: データ取得',
     );
-
-    // シナリオスロットセット（連続出走カウント除外用）
-    const scenarioSlotSet = new Set<string>();
-    for (const sr of scenarioRaces) {
-      const grade = getRaceGrade(sr.race, sr);
-      scenarioSlotSet.add(sk(grade, sr.race.race_months, sr.race.half_flag));
-    }
 
     // larc_flag またはラーク固有レース名でラーク残存を判定
     const hasRemainingLarc = remainingRacesAll.some(
       (r) => r.larc_flag || LARC_SPECIFIC_NAMES.has(r.race_name),
     );
 
-    return { umaData, allGRaces, remainingRacesAll, scenarioRaces, scenarioSlotSet, hasRemainingLarc, registRaceIds };
+    return { umaData, allGRaces, remainingRacesAll, hasRemainingLarc, registRaceIds };
   }
 
   /**
@@ -779,7 +741,6 @@ export class RacePatternService {
     remainingBCRaces: RaceRow[],
     remainingRacesAll: RaceRow[],
     hasRemainingLarc: boolean,
-    scenarioRaces: ScenarioRaceRow[],
   ): BCPatternsInit {
     const nBC = remainingBCRaces.length;
 
@@ -835,11 +796,9 @@ export class RacePatternService {
 
     this.logger.debug({}, 'Phase 5 完了: 適性オブジェクト設定');
 
-    // 割り当て対象レースの絞り込み（シナリオ・ラーク専用・BC・BC中間を除外）
-    const scenarioRaceIds = new Set(scenarioRaces.map((sr) => sr.race.race_id));
+    // 割り当て対象レースの絞り込み（ラーク専用・BC・BC中間を除外）
     const racesToAssign = remainingRacesAll.filter(
       (r) =>
-        !scenarioRaceIds.has(r.race_id) &&
         !(hasRemainingLarc && LARC_EXCLUSIVE_NAMES.has(r.race_name)) &&
         !r.bc_flag &&
         !bcMandatoryPrePlacedIds.has(r.race_id),
@@ -859,7 +818,6 @@ export class RacePatternService {
     patternStrategies: (Record<string, number> | null)[],
     aptitudeStates: AptitudeState[],
     racesToAssign: RaceRow[],
-    scenarioSlotSet: Set<string>,
     umaData: UmamusumeRow,
   ): Set<number> {
     const assignedRaceIds = new Set<number>();
@@ -892,7 +850,7 @@ export class RacePatternService {
       for (const race of candidateRaces) {
         for (let pi = 0; pi < nBC; pi++) {
           if (grid[pi].has(slotK)) continue;
-          if (isConsecutiveViolation(grid[pi], slotK, scenarioSlotSet)) continue;
+          if (isConsecutiveViolation(grid[pi], slotK)) continue;
 
           // 馬場・距離適性が D 未満（E/F/G）の場合、因子補修で走れるようになるか確認
           let enhancement: Record<string, number> | null = null;
@@ -923,7 +881,7 @@ export class RacePatternService {
           }
           // else: score = 0（非マッチ・戦略確定済みパターン）→ フォールバックとして残す
 
-          score -= getConsecutiveLength(grid[pi], slotK, scenarioSlotSet); // 連続出走ペナルティ
+          score -= getConsecutiveLength(grid[pi], slotK); // 連続出走ペナルティ
           score += (4 - race.race_rank); // G1=+3, G2=+2, G3=+1
 
           candidates.push({ race, pi, score, needsStrategySet, enhancement });
@@ -1010,7 +968,6 @@ export class RacePatternService {
     assignedRaceIds: Set<number>,
     remainingRacesAll: RaceRow[],
     larcAptState: AptitudeState,
-    scenarioSlotSet: Set<string>,
   ): Map<string, RaceRow> {
     const larcGrid: Map<string, RaceRow> = new Map();
 
@@ -1033,7 +990,7 @@ export class RacePatternService {
         const slotK = sk(slot.grade, slot.month, slot.half);
         if (larcGrid.has(slotK)) continue;
         if (isLarcRestrictedSlot(slot.grade, slot.month, slot.half)) continue;
-        if (isConsecutiveViolation(larcGrid, slotK, scenarioSlotSet)) continue;
+        if (isConsecutiveViolation(larcGrid, slotK)) continue;
         larcGrid.set(slotK, race);
         placed = true;
       }
@@ -1054,7 +1011,6 @@ export class RacePatternService {
     allGRaces: RaceRow[],
     remainingRacesAll: RaceRow[],
     umaData: UmamusumeRow,
-    scenarioSlotSet: Set<string>,
   ): { grid: Map<string, RaceRow>; strategy: Record<string, number> | null; aptState: AptitudeState }[] {
     const results: { grid: Map<string, RaceRow>; strategy: Record<string, number> | null; aptState: AptitudeState }[] = [];
     const allBCFinalRaces = allGRaces.filter((r) => r.bc_flag);
@@ -1109,7 +1065,7 @@ export class RacePatternService {
       const aptitudeStatesLocal: AptitudeState[] = [bestAptState];
       const newlyAssigned = this.assignRacesToBCGrids(
         1, [bestBC], [newGrid], patternStrategiesLocal, aptitudeStatesLocal,
-        remaining, scenarioSlotSet, umaData,
+        remaining, umaData,
       );
 
       if (newlyAssigned.size > 0) {
