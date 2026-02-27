@@ -90,6 +90,7 @@
       ]
     },
     "moduleNameMapper": {
+      "^nestjs-pino$": "<rootDir>/test/unit/__mocks__/nestjs-pino.ts",
       "^@uma-crown/shared$": "<rootDir>/../shared/types/index.ts",
       "^@common/(.*)\\.js$": "<rootDir>/src/common/$1",
       "^@common/(.*)$": "<rootDir>/src/common/$1",
