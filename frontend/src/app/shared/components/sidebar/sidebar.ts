@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { AuthService } from '@core/services/auth.service';
 import { NavigationService, ViewState } from '@core/services/navigation.service';
+import { ToastService } from '@ui/components/toast/toast.service';
 
 /** サイドバーのナビゲーション項目を表すインターフェース */
 interface SidebarItem {
@@ -12,14 +13,17 @@ interface SidebarItem {
   page: ViewState['page'];
   /** タブ画像ファイル名 */
   img: string;
+  /** ログイン必須かどうか */
+  requiresLogin: boolean;
 }
 
 /** サイドバーに表示するナビゲーション項目の定義 */
 const sidebarItems: SidebarItem[] = [
-  { id: 1, name: 'ウマ娘情報登録', page: 'character-regist', img: 'SpecialWeek.png' },
-  { id: 2, name: 'ウマ娘情報表示', page: 'character-list', img: 'SeiunSky.png' },
-  { id: 3, name: 'レース情報表示', page: 'race-list', img: 'KingHalo.png' },
-  { id: 4, name: '残レース情報表示', page: 'remaining-race', img: 'GrassWonder.png' },
+  { id: 0, name: '説明', page: 'landing', img: 'TsurumaruTsuyoshi.png', requiresLogin: false },
+  { id: 1, name: 'ウマ娘情報登録', page: 'character-regist', img: 'SpecialWeek.png', requiresLogin: true },
+  { id: 2, name: 'ウマ娘情報表示', page: 'character-list', img: 'SeiunSky.png', requiresLogin: true },
+  { id: 3, name: 'レース情報表示', page: 'race-list', img: 'KingHalo.png', requiresLogin: true },
+  { id: 4, name: '残レース計算表示', page: 'remaining-race', img: 'GrassWonder.png', requiresLogin: true },
 ];
 
 @Component({
@@ -59,28 +63,65 @@ const sidebarItems: SidebarItem[] = [
       <ul class="flex-1 space-y-4">
         @for (item of items; track item.id) {
           <li>
-            <button
-              (click)="navigateTo(item.page)"
-              class="block w-full text-center text-lg font-bold py-4 rounded-xl border-2 border-gray-300
-                     bg-cover bg-center text-purple-500 transition-all duration-300
-                     hover:bg-pink-200 cursor-pointer hover:text-white hover:scale-105 hover:shadow-lg"
-              [class.!bg-pink-200]="isActive(item.page)"
-              [class.!text-white]="isActive(item.page)"
-              [class.!shadow-lg]="isActive(item.page)"
-              [style.background-image]="'url(/image/SidebarTab/' + item.img + ')'"
-            >
-              {{ item.name }}
-            </button>
+            @if (!item.requiresLogin || authService.isLoggedIn()) {
+              <!-- ログイン不要 or ログイン済み: 通常ボタン -->
+              <button
+                (click)="navigateTo(item.page)"
+                class="block w-full text-center text-lg font-bold py-4 rounded-xl border-2 border-gray-300
+                       bg-cover bg-center text-purple-500 transition-all duration-300
+                       hover:bg-pink-200 cursor-pointer hover:text-white hover:scale-105 hover:shadow-lg"
+                [class.!bg-pink-200]="isActive(item.page)"
+                [class.!text-white]="isActive(item.page)"
+                [class.!shadow-lg]="isActive(item.page)"
+                [style.background-image]="'url(/image/SidebarTab/' + item.img + ')'"
+              >
+                {{ item.name }}
+              </button>
+            } @else {
+              <!-- 未ログイン: グレーアウト + 🔒 -->
+              <button
+                (click)="onDisabledClick()"
+                class="block w-full text-center text-lg font-bold py-4 rounded-xl border-2 border-gray-200
+                       bg-gray-100 text-gray-400 cursor-not-allowed select-none opacity-60"
+              >
+                🔒 {{ item.name }}
+              </button>
+            }
           </li>
         }
       </ul>
 
-      <button
-        (click)="onLogout()"
-        class="mt-4 w-full py-2 rounded-lg bg-red-500 text-white font-bold hover:bg-red-600 transition cursor-pointer"
-      >
-        ログアウト
-      </button>
+      <!-- 未ログイン時の警告メッセージ -->
+      @if (!authService.isLoggedIn()) {
+        <p class="text-red-500 text-xs text-center mt-2 mb-1 font-semibold">
+          ⚠️ ログインすると利用できます
+        </p>
+      }
+
+      <!-- 下部: ログイン状態に応じてボタンを切り替え -->
+      @if (authService.isLoggedIn()) {
+        <button
+          (click)="onLogout()"
+          class="mt-4 w-full py-2 rounded-lg bg-red-500 text-white font-bold hover:bg-red-600 transition cursor-pointer"
+        >
+          ログアウト
+        </button>
+      } @else {
+        <div class="mt-4 flex flex-col gap-2">
+          <button
+            (click)="navigateToLogin()"
+            class="w-full py-2 rounded-lg bg-blue-500 text-white font-bold hover:bg-blue-600 transition cursor-pointer"
+          >
+            ログイン
+          </button>
+          <button
+            (click)="navigateToRegister()"
+            class="w-full py-2 rounded-lg bg-green-500 text-white font-bold hover:bg-green-600 transition cursor-pointer"
+          >
+            会員登録
+          </button>
+        </div>
+      }
     </nav>
   `,
 })
@@ -88,15 +129,16 @@ const sidebarItems: SidebarItem[] = [
 export class SidebarComponent {
   /** サイドバーに表示するナビゲーション項目 */
   protected readonly items = sidebarItems;
-  private readonly authService = inject(AuthService);
+  protected readonly authService = inject(AuthService);
   protected readonly navService = inject(NavigationService);
+  private readonly toastService = inject(ToastService);
 
   /** ドロワーの開閉状態 */
   protected readonly drawerOpen = signal(false);
 
   /** ドロワーの開閉を切り替える */
   protected toggleDrawer(): void {
-    this.drawerOpen.update(v => !v);
+    this.drawerOpen.update((v: boolean) => !v);
   }
 
   /** ドロワーを閉じる */
@@ -119,9 +161,27 @@ export class SidebarComponent {
     this.closeDrawer();
   }
 
+  /** 未ログイン時に無効なボタンを押したときの処理 */
+  onDisabledClick(): void {
+    this.toastService.show('ログインが必要です', 'error');
+  }
+
+  /** ログインページへ遷移する */
+  navigateToLogin(): void {
+    this.navService.navigate({ page: 'login' });
+    this.closeDrawer();
+  }
+
+  /** 会員登録ページへ遷移する */
+  navigateToRegister(): void {
+    this.navService.navigate({ page: 'register' });
+    this.closeDrawer();
+  }
+
   /** ログアウトボタンクリック時の処理 */
-  onLogout() {
+  onLogout(): void {
     this.authService.logout();
+    this.navService.navigate({ page: 'landing' });
     this.closeDrawer();
   }
 }

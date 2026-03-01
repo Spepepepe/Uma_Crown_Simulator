@@ -8,7 +8,7 @@ import { NavigationService } from '@core/services/navigation.service';
   standalone: true,
   imports: [FormsModule],
   template: `
-    <div class="fixed inset-0 flex items-center justify-center bg-cover bg-center bg-no-repeat"
+    <div class="min-h-screen flex items-center justify-center bg-cover bg-center bg-no-repeat"
          style="background-image: url('/image/backgroundFile/login-bg.png')">
       <div class="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-8 w-full max-w-md overflow-y-auto max-h-[90vh]">
 
@@ -55,7 +55,7 @@ import { NavigationService } from '@core/services/navigation.service';
 
             <button
               type="button"
-              (click)="navService.navigate({ page: 'login' })"
+              (click)="navService.navigate({ page: 'landing' })"
               class="w-full py-3 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition cursor-pointer"
             >
               戻る

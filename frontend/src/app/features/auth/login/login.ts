@@ -8,7 +8,7 @@ import { NavigationService } from '@core/services/navigation.service';
   standalone: true,
   imports: [FormsModule],
   template: `
-    <div class="fixed inset-0 flex items-center justify-center bg-cover bg-center bg-no-repeat"
+    <div class="min-h-screen flex items-center justify-center bg-cover bg-center bg-no-repeat"
          style="background-image: url('/image/backgroundFile/login-bg.png')">
       <div class="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-8 w-full max-w-md">
         <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">ログイン</h1>
@@ -91,7 +91,7 @@ export class LoginComponent {
     const result = await this.authService.login(this.email, this.password);
 
     if (result.success) {
-      this.navService.navigate({ page: 'character-regist' });
+      this.navService.navigate({ page: 'landing' });
     } else {
       this.errorMessage.set(result.error ?? 'ログインに失敗しました');
     }
