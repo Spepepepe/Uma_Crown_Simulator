@@ -94,4 +94,50 @@ describe('ToastService', () => {
       expect(service.toast().isVisible).toBe(false);
     });
   });
+
+  // ─────────────────────────────────────────────
+  // showSessionExpired
+  // ─────────────────────────────────────────────
+  describe('showSessionExpired', () => {
+    it('persistent な error トーストを表示する', () => {
+      service.showSessionExpired();
+
+      expect(service.toast().isVisible).toBe(true);
+      expect(service.toast().type).toBe('error');
+      expect(service.toast().persistent).toBe(true);
+      expect(service.toast().message).toBe('セッションの有効期限が切れました。ページを更新してください。');
+    });
+
+    it('persistent トーストが既に表示中の場合は何もしない（重複防止）', () => {
+      service.showSessionExpired();
+      const firstMessage = service.toast().message;
+
+      // 2回目は早期リターンするため状態が変わらない
+      service.showSessionExpired();
+
+      expect(service.toast().message).toBe(firstMessage);
+    });
+
+    it('通常トーストが表示中の場合は上書きする', () => {
+      service.show('通常メッセージ');
+      expect(service.toast().persistent).toBeFalsy();
+
+      service.showSessionExpired();
+
+      expect(service.toast().persistent).toBe(true);
+      expect(service.toast().type).toBe('error');
+    });
+
+    it('show() のタイマーをキャンセルし、3 秒後も表示され続ける', () => {
+      vi.useFakeTimers();
+      service.show('通常メッセージ');
+
+      service.showSessionExpired();
+      vi.advanceTimersByTime(3000);
+
+      // show() のタイマーがキャンセルされ、persistent トーストは非表示にならない
+      expect(service.toast().isVisible).toBe(true);
+      expect(service.toast().persistent).toBe(true);
+    });
+  });
 });

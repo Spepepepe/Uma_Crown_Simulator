@@ -21,6 +21,8 @@ const mocks = vi.hoisted(() => ({
   mockResendConfirmationCode: vi.fn(),
   mockGetSession: vi.fn(),
   mockGetJwtToken: vi.fn().mockReturnValue('mock-jwt-token'),
+  mockForgotPassword: vi.fn(),
+  mockConfirmPassword: vi.fn(),
 }));
 
 // ─── amazon-cognito-identity-js をモック化 ────────────────────────────────
@@ -41,6 +43,8 @@ vi.mock('amazon-cognito-identity-js', () => ({
       signOut: mocks.mockSignOut,
       confirmRegistration: mocks.mockConfirmRegistration,
       resendConfirmationCode: mocks.mockResendConfirmationCode,
+      forgotPassword: mocks.mockForgotPassword,
+      confirmPassword: mocks.mockConfirmPassword,
     };
   }),
   AuthenticationDetails: vi.fn().mockImplementation(function () {}),
@@ -60,6 +64,8 @@ describe('AuthService', () => {
     mocks.mockSignOut.mockReset();
     mocks.mockGetSession.mockReset();
     mocks.mockGetJwtToken.mockReturnValue('mock-jwt-token');
+    mocks.mockForgotPassword.mockReset();
+    mocks.mockConfirmPassword.mockReset();
 
     TestBed.configureTestingModule({
       providers: [provideRouter([])],
@@ -121,6 +127,39 @@ describe('AuthService', () => {
       const svc = TestBed.inject(AuthService);
 
       expect(svc.getToken()).toBeNull();
+    });
+
+    it('getSession がエラーを返した場合はトークンが設定されない', () => {
+      mocks.mockGetCurrentUser.mockReturnValue({
+        getSession: (cb: Function) => cb(new Error('SessionError'), null),
+      });
+
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ providers: [provideRouter([])] });
+      const svc = TestBed.inject(AuthService);
+
+      expect(svc.getToken()).toBeNull();
+    });
+
+    it('Cognito ユーザーがいない場合は isInitialized が true になる', () => {
+      // beforeEach で mockGetCurrentUser は null を返すよう設定済み
+      expect(service.isInitialized()).toBe(true);
+    });
+
+    it('セッション復元が完了したら isInitialized が true になる', () => {
+      const mockSession = {
+        isValid: () => true,
+        getIdToken: () => ({ getJwtToken: mocks.mockGetJwtToken }),
+      };
+      mocks.mockGetCurrentUser.mockReturnValue({
+        getSession: (cb: Function) => cb(null, mockSession),
+      });
+
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ providers: [provideRouter([])] });
+      const svc = TestBed.inject(AuthService);
+
+      expect(svc.isInitialized()).toBe(true);
     });
   });
 
@@ -258,6 +297,143 @@ describe('AuthService', () => {
       await service.login('test@example.com', 'password');
 
       expect(service.getToken()).toBe('my-token');
+    });
+  });
+
+  // ─────────────────────────────────────────────
+  // forgotPassword
+  // ─────────────────────────────────────────────
+  describe('forgotPassword', () => {
+    it('送信成功時に success: true を返す', async () => {
+      mocks.mockForgotPassword.mockImplementation((cb: any) => {
+        cb.onSuccess();
+      });
+
+      const result = await service.forgotPassword('test@example.com');
+
+      expect(result.success).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('送信失敗時に success: false と error メッセージを返す', async () => {
+      mocks.mockForgotPassword.mockImplementation((cb: any) => {
+        cb.onFailure(new Error('UserNotFoundException'));
+      });
+
+      const result = await service.forgotPassword('notfound@example.com');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('UserNotFoundException');
+    });
+  });
+
+  // ─────────────────────────────────────────────
+  // confirmForgotPassword
+  // ─────────────────────────────────────────────
+  describe('confirmForgotPassword', () => {
+    it('パスワードリセット成功時に success: true を返す', async () => {
+      mocks.mockConfirmPassword.mockImplementation((_code: string, _pw: string, cb: any) => {
+        cb.onSuccess();
+      });
+
+      const result = await service.confirmForgotPassword('test@example.com', '123456', 'NewPass1!');
+
+      expect(result.success).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('パスワードリセット失敗時に success: false と error メッセージを返す', async () => {
+      mocks.mockConfirmPassword.mockImplementation((_code: string, _pw: string, cb: any) => {
+        cb.onFailure(new Error('CodeMismatchException'));
+      });
+
+      const result = await service.confirmForgotPassword('test@example.com', 'wrong', 'NewPass1!');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('CodeMismatchException');
+    });
+  });
+
+  // ─────────────────────────────────────────────
+  // resendConfirmationCode
+  // ─────────────────────────────────────────────
+  describe('resendConfirmationCode', () => {
+    it('再送成功時に success: true を返す', async () => {
+      mocks.mockResendConfirmationCode.mockImplementation((cb: Function) => cb(null, 'SUCCESS'));
+
+      const result = await service.resendConfirmationCode('test@example.com');
+
+      expect(result.success).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('再送失敗時に success: false と error メッセージを返す', async () => {
+      mocks.mockResendConfirmationCode.mockImplementation((cb: Function) =>
+        cb(new Error('LimitExceededException')),
+      );
+
+      const result = await service.resendConfirmationCode('test@example.com');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('LimitExceededException');
+    });
+  });
+
+  // ─────────────────────────────────────────────
+  // getFreshToken
+  // ─────────────────────────────────────────────
+  describe('getFreshToken', () => {
+    it('Cognito ユーザーがいない場合は null を返す', async () => {
+      // beforeEach で mockGetCurrentUser は null を返すよう設定済み
+      const result = await service.getFreshToken();
+
+      expect(result).toBeNull();
+    });
+
+    it('セッションが有効な場合はトークンを返し tokenSignal も更新する', async () => {
+      const freshToken = 'fresh-jwt-token';
+      mocks.mockGetCurrentUser.mockReturnValue({
+        getSession: mocks.mockGetSession,
+      });
+      mocks.mockGetSession.mockImplementation((cb: Function) => {
+        cb(null, {
+          isValid: () => true,
+          getIdToken: () => ({ getJwtToken: () => freshToken }),
+        });
+      });
+
+      const result = await service.getFreshToken();
+
+      expect(result).toBe(freshToken);
+      expect(service.getToken()).toBe(freshToken);
+    });
+
+    it('セッションが無効な場合は null を返し tokenSignal をクリアする', async () => {
+      mocks.mockGetCurrentUser.mockReturnValue({
+        getSession: mocks.mockGetSession,
+      });
+      mocks.mockGetSession.mockImplementation((cb: Function) => {
+        cb(null, { isValid: () => false });
+      });
+
+      const result = await service.getFreshToken();
+
+      expect(result).toBeNull();
+      expect(service.getToken()).toBeNull();
+    });
+
+    it('getSession がエラーを返した場合は null を返し tokenSignal をクリアする', async () => {
+      mocks.mockGetCurrentUser.mockReturnValue({
+        getSession: mocks.mockGetSession,
+      });
+      mocks.mockGetSession.mockImplementation((cb: Function) => {
+        cb(new Error('TokenExpired'), null);
+      });
+
+      const result = await service.getFreshToken();
+
+      expect(result).toBeNull();
+      expect(service.getToken()).toBeNull();
     });
   });
 });

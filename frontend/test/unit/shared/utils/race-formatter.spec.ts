@@ -92,5 +92,13 @@ describe('race-formatter', () => {
       expect(getRunSeason({ ...baseRace, classic_flag: true, senior_flag: true }))
         .toBe('クラシック / シニア');
     });
+
+    it('クラシックのみのとき "クラシック" を返す', () => {
+      expect(getRunSeason({ ...baseRace, classic_flag: true })).toBe('クラシック');
+    });
+
+    it('シニアのみのとき "シニア" を返す', () => {
+      expect(getRunSeason({ ...baseRace, senior_flag: true })).toBe('シニア');
+    });
   });
 });
