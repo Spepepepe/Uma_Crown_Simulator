@@ -174,10 +174,6 @@ uma-crown-simulator/
 │   ├── system.md                    # プロジェクト全容・コーディング規約
 │   ├── commit.md                    # コミットメッセージ規約
 │   └── operations.md                # 運用・デプロイ手順
-├── script/                          # 開発補助スクリプト・AI 向け入力素材
-│   ├── commit-prompt.md             # コミットメッセージ生成用プロンプト
-│   ├── readme-background.md         # README 背景情報
-│   └── test-bc-coverage.md          # BC テストカバレッジメモ
 ├── docker-compose.yml               # 開発環境オーケストレーション
 ├── .env.example                     # 環境変数テンプレート
 └── package.json                     # npm workspaces ルート定義
