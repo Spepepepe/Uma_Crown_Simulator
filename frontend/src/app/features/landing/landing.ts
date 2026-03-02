@@ -14,7 +14,7 @@ interface FeatureCard {
 const featureCards: FeatureCard[] = [
   {
     title: 'ウマ娘情報登録',
-    description: '育成したウマ娘の適性・因子情報を登録できます。',
+    description: '登録するウマ娘の出走済みレースを設定できます。',
   },
   {
     title: 'ウマ娘情報表示',

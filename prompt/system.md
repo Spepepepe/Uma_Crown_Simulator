@@ -155,3 +155,6 @@ GET  /races/patterns/:umamusumeId   # 出走パターン候補取得
 - NestJS: ESM（`.js` 拡張子付きインポート）
 - Tailwind: ユーティリティクラス直書き（CSS ファイル原則なし）
 - 型は `shared/` に集約、フロント・バックで共有
+- **JSDoc**: クラス・メソッド・公開プロパティに `/** 日本語説明 */` を付ける
+  - メソッドには `@param` / `@returns` タグも記載
+  - 単純な getter・signal の computed は省略可

@@ -1,6 +1,11 @@
 # 育成パターン計算アルゴリズム
 
-実装: [backend/src/race/race-pattern.service.ts](../backend/src/race/race-pattern.service.ts)
+実装:
+- [backend/src/race/pattern/race-pattern.service.ts](../backend/src/race/pattern/race-pattern.service.ts) — オーケストレーター（DB アクセス・後処理）
+- [backend/src/race/pattern/bc-pattern-builder.service.ts](../backend/src/race/pattern/bc-pattern-builder.service.ts) — BC シナリオ パターン生成
+- [backend/src/race/pattern/larc-pattern-builder.service.ts](../backend/src/race/pattern/larc-pattern-builder.service.ts) — ラークシナリオ パターン生成
+- [backend/src/race/pattern/pattern.helpers.ts](../backend/src/race/pattern/pattern.helpers.ts) — 純粋関数群（適性計算・スロット操作等）
+- [backend/src/race/pattern/pattern.constants.ts](../backend/src/race/pattern/pattern.constants.ts) — BC/ラーク定数・スロット順序定義
 
 ## 問題の背景
 
@@ -10,7 +15,7 @@
 さらに以下の制約が絡み合います。
 
 - 同一スロット（月・前後半）には 1レースしか出走できない
-- 連続 4 戦以上の出走は禁止（ゲームルール）
+- 連続 4 戦以上になると勝利が困難になるため、連続出走を 3 戦以内に抑える制約を設けている
 - シナリオ（伝説）では特定レースが目標として固定される
 - L'Arc（ラーク）シナリオはクラシック 7〜10 月・シニア 6 月後半以降の自由出走が禁止
 
@@ -61,7 +66,7 @@ N合計     = Nメイクラ + (シナリオレースが存在すれば +1)
 
 | 制約 | 処理 |
 |------|------|
-| 連続 4 戦禁止 | スロット線形順序（60スロット通し番号）上で隣接スロットを走査し、連続長が 3 以上になる配置を禁止。シナリオ固定レースはカウント対象外 |
+| 連続出走 3 戦以内 | スロット線形順序（60スロット通し番号）上で隣接スロットを走査し、連続長が 3 以上になる配置を禁止。シナリオ固定レースはカウント対象外 |
 | L'Arc 制限スロット | ラーク候補パターンでは classic 7〜10 月前半・senior 6 月後半以降への通常レース配置を禁止 |
 | シナリオレース分離 | 通常割り当て対象から除外し、伝説パターン（index=0）に固定配置 |
 
@@ -199,7 +204,7 @@ LARC_MANDATORY レース（日本ダービー・宝塚記念・凱旋門賞等�
 
 | 制約 | 処理 |
 |------|------|
-| 連続 4 戦禁止 | スロット線形順序（60スロット通し番号）上で隣接スロットを走査し、連続長が 3 以上になる配置を禁止 |
+| 連続出走 3 戦以内 | スロット線形順序（60スロット通し番号）上で隣接スロットを走査し、連続長が 3 以上になる配置を禁止 |
 | BC 制限スロット | シニア 11 月後半・12 月への通常レース配置を禁止 |
 | BC 必須中間レース | 通常割り当て対象から除外し、各 BC パターンに固定配置（出走済みでも参照表示） |
 | L'Arc 制限スロット | ラーク候補パターンではクラシック 5 月後半・7〜9 月・10 月前半、シニア 6 月後半以降を禁止 |

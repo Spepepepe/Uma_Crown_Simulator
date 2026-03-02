@@ -83,6 +83,15 @@ describe('RaceService', () => {
       );
       expect(result).toEqual(mockRaces);
     });
+
+    it('APIエラー時にエラーを伝播する', () => {
+      httpMock.get.mockReturnValue(throwError(() => new Error('Network error')));
+
+      let error: unknown;
+      service.getRegistrationTargets().subscribe({ error: (e) => (error = e) });
+
+      expect(error).toBeInstanceOf(Error);
+    });
   });
 
   // ─────────────────────────────────────────────
@@ -98,6 +107,15 @@ describe('RaceService', () => {
 
       expect(httpMock.get).toHaveBeenCalledWith(expect.stringContaining('/races/remaining'));
       expect(result).toEqual(mockData);
+    });
+
+    it('APIエラー時にエラーを伝播する', () => {
+      httpMock.get.mockReturnValue(throwError(() => new Error('Network error')));
+
+      let error: unknown;
+      service.getRemainingRaces().subscribe({ error: (e) => (error = e) });
+
+      expect(error).toBeInstanceOf(Error);
     });
   });
 
@@ -115,6 +133,15 @@ describe('RaceService', () => {
       expect(httpMock.get).toHaveBeenCalledWith(expect.stringContaining('/races/patterns/42'));
       expect(result).toEqual(mockResponse);
     });
+
+    it('APIエラー時にエラーを伝播する', () => {
+      httpMock.get.mockReturnValue(throwError(() => new Error('Network error')));
+
+      let error: unknown;
+      service.getPatterns(1).subscribe({ error: (e) => (error = e) });
+
+      expect(error).toBeInstanceOf(Error);
+    });
   });
 
   // ─────────────────────────────────────────────
@@ -131,6 +158,15 @@ describe('RaceService', () => {
         expect.stringContaining('/races/results/batch'),
         { umamusumeId: 1, races: mockRaces },
       );
+    });
+
+    it('APIエラー時にエラーを伝播する', () => {
+      httpMock.post.mockReturnValue(throwError(() => new Error('Server error')));
+
+      let error: unknown;
+      service.registerBatchResults(1, []).subscribe({ error: (e) => (error = e) });
+
+      expect(error).toBeInstanceOf(Error);
     });
   });
 

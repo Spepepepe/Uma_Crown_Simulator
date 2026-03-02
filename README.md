@@ -154,6 +154,30 @@ uma-crown-simulator/
 │       └── cicd/                    # GitHub Actions OIDC, IAM Role
 │
 ├── docs/                            # ドキュメント
+│   ├── architecture.md              # システム構成図・モジュール詳細・ER図
+│   ├── algorithm.md                 # 育成パターン計算アルゴリズム解説
+│   ├── api.md                       # API エンドポイント一覧
+│   ├── development.md               # 開発環境・テスト・ビルド手順
+│   ├── testing.md                   # テスト構成・シナリオ詳細
+│   └── infrastructure.md            # AWS インフラ構成・Terraform デプロイ手順
+├── k8s/                             # Kubernetes マニフェスト (ローカル開発用)
+│   ├── deploy.sh                    # デプロイスクリプト
+│   ├── teardown.sh                  # クリーンアップスクリプト
+│   ├── namespace.yaml               # Namespace 定義
+│   ├── configmap.yaml               # 環境変数 ConfigMap
+│   ├── secret.yaml                  # シークレット定義
+│   ├── postgres-deployment.yaml     # PostgreSQL Deployment / Service
+│   ├── backend-deployment.yaml      # NestJS Deployment / Service
+│   ├── frontend-deployment.yaml     # Angular Deployment / Service
+│   └── ingress.yaml                 # Ingress ルーティング
+├── prompt/                          # AI 向けコンテキスト・プロンプト集
+│   ├── system.md                    # プロジェクト全容・コーディング規約
+│   ├── commit.md                    # コミットメッセージ規約
+│   └── operations.md                # 運用・デプロイ手順
+├── script/                          # 開発補助スクリプト・AI 向け入力素材
+│   ├── commit-prompt.md             # コミットメッセージ生成用プロンプト
+│   ├── readme-background.md         # README 背景情報
+│   └── test-bc-coverage.md          # BC テストカバレッジメモ
 ├── docker-compose.yml               # 開発環境オーケストレーション
 ├── .env.example                     # 環境変数テンプレート
 └── package.json                     # npm workspaces ルート定義
@@ -167,4 +191,5 @@ uma-crown-simulator/
 | [docs/algorithm.md](docs/algorithm.md) | 育成パターン計算アルゴリズム |
 | [docs/api.md](docs/api.md) | API エンドポイント一覧 |
 | [docs/development.md](docs/development.md) | 開発環境・テスト・ビルド手順 |
+| [docs/testing.md](docs/testing.md) | テスト構成・シナリオ詳細 |
 | [docs/infrastructure.md](docs/infrastructure.md) | AWS インフラ構成・Terraform デプロイ手順 |
