@@ -8,6 +8,8 @@ export interface Toast {
   type: 'success' | 'error';
   /** 表示中かどうか */
   isVisible: boolean;
+  /** 自動非表示しない場合 true */
+  persistent?: boolean;
 }
 
 /** 画面上部にトースト通知を表示するサービス */
@@ -34,5 +36,20 @@ export class ToastService {
       this.toast.set({ message: '', type: 'success', isVisible: false });
       this.timerId = null;
     }, 3000);
+  }
+
+  /** セッション切れ通知を表示する（自動非表示なし・重複表示しない） */
+  showSessionExpired() {
+    if (this.toast().isVisible && this.toast().persistent) return;
+    if (this.timerId) {
+      clearTimeout(this.timerId);
+      this.timerId = null;
+    }
+    this.toast.set({
+      message: 'セッションの有効期限が切れました。ページを更新してください。',
+      type: 'error',
+      isVisible: true,
+      persistent: true,
+    });
   }
 }
