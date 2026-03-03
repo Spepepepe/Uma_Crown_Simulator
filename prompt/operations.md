@@ -108,3 +108,42 @@ npm start
 ```
 
 アクセス URL: `http://localhost:4200`
+
+---
+
+## npm scripts
+
+### バックエンド（`backend/` で実行）
+
+| コマンド | 内容 |
+|---|---|
+| `npm run start:dev` | ホットリロードで開発サーバー起動 |
+| `npm run build` | NestJS ビルド（tsc-alias でパスエイリアス解決） |
+| `npm run start:prod` | 本番用（dist/main 実行） |
+| `npm run lint` | ESLint（--fix 付き） |
+| `npm run test` | Jest ユニットテスト |
+| `npm run test:cov` | カバレッジレポート生成 |
+| `npm run test:e2e` | E2E テスト |
+| `npm run prisma:generate` | Prisma Client 再生成 |
+| `npm run prisma:push` | スキーマを DB にプッシュ（開発用） |
+
+### フロントエンド（`frontend/` で実行）
+
+| コマンド | 内容 |
+|---|---|
+| `npm start` | 開発サーバー起動（localhost:4200） |
+| `npm run build` | 本番ビルド |
+| `npm run test` | Angular テスト（Karma） |
+| `npm run watch` | ウォッチモードビルド |
+
+---
+
+## ブランチ戦略
+
+| ブランチ | 役割 |
+|---|---|
+| `main` | 本番リリース用 |
+| `develop` | 開発統合ブランチ |
+
+- 作業は `develop` で行い、PR を `main` へ出してリリース
+- PR のベースブランチは原則 `main`
