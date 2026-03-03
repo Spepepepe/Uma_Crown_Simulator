@@ -67,6 +67,18 @@ const featureCards: FeatureCard[] = [
             </button>
           </div>
         }
+
+        <!-- 使い方記事リンク -->
+        <a
+          href="https://qiita.com/spepepepe/items/9b14f8c988c14953b96c"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mt-4 inline-flex items-center gap-2 px-6 py-2 bg-white/20 text-white font-semibold
+                 rounded-xl border border-white/50 shadow hover:bg-white/30 transition-all duration-200
+                 hover:scale-105 backdrop-blur-sm"
+        >
+          使い方を見る（Qiita）
+        </a>
       </div>
 
       <!-- 機能カードセクション -->
