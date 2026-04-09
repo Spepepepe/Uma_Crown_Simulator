@@ -1636,5 +1636,18 @@
         "mile_aptitude": "B",
         "classic_aptitude": "A",
         "long_distance_aptitude": "B"
+    },
+    "ラッキーライラック": {
+        "umamusume_name": "ラッキーライラック",
+        "turf_aptitude": "A",
+        "dirt_aptitude": "G",
+        "front_runner_aptitude": "F",
+        "early_foot_aptitude": "A",
+        "midfield_aptitude": "A",
+        "closer_aptitude": "G",
+        "sprint_aptitude": "G",
+        "mile_aptitude": "A",
+        "classic_aptitude": "A",
+        "long_distance_aptitude": "C"
     }
 }
