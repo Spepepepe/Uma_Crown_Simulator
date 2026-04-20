@@ -381,12 +381,17 @@ export class BCPatternBuilderService {
     // 残りパターン（index >= nBCFromIntermediate）: 初期適性で BC 最終を仮決定し中間レースを先置き
     // assignRacesToBCGrids より前に設定することで中間レーススロットへの残レース混入を防ぐ
 
-    // 残レースのうちそのスロットにしか出走できないレース（シングルスロット）のスロットキーを収集
+    // 残レースのうち有効スロットが1つしかないレース（BC制限スロット除外後）のスロットキーを収集
     // BC中間レースがそのスロットを塞ぐBCを選ばないようにするため
     const singleSlotKeys = new Set(
-      racesToAssign
-        .filter((r) => getAvailableSlots(r).length === 1)
-        .map((r) => { const [s] = getAvailableSlots(r); return sk(s.grade, s.month, s.half); }),
+      racesToAssign.flatMap((r) => {
+        const usableSlots = getAvailableSlots(r).filter(
+          (s) => !isBCRestrictedSlot(s.grade, s.month, s.half),
+        );
+        if (usableSlots.length !== 1) return [];
+        const [s] = usableSlots;
+        return [sk(s.grade, s.month, s.half)];
+      }),
     );
 
     const usedBCFinalNames = new Set(sortedBCFinalNames);
@@ -429,6 +434,53 @@ export class BCPatternBuilderService {
       N, sortedBCRacesForAssign, grid, patternStrategies, aptitudeStates, racesToAssign, umaData,
     );
 
+    // フェーズ5後: 連続出走制約などで割り当てられなかったレースに追加パターンを生成する
+    // スロット圧力計算は連続出走制約を考慮できないため、未割り当て残レースを緊急パターンとして追加する
+    const assignedInPhase5 = new Set<number>();
+    for (const g of grid) for (const r of g.values()) assignedInPhase5.add(r.race_id);
+    const unassignedRaces = racesToAssign.filter((r) => !assignedInPhase5.has(r.race_id));
+    if (unassignedRaces.length > 0) {
+      // 未割り当てレースをスロット単位にグループ化し、スロットを塞がない BC でパターンを追加する
+      const usedSlotsForEmergency = new Map<string, RaceRow[]>();
+      for (const race of unassignedRaces) {
+        const usable = getAvailableSlots(race).filter((s) => !isBCRestrictedSlot(s.grade, s.month, s.half));
+        if (usable.length === 0) continue;
+        const key = sk(usable[0].grade, usable[0].month, usable[0].half);
+        if (!usedSlotsForEmergency.has(key)) usedSlotsForEmergency.set(key, []);
+        usedSlotsForEmergency.get(key)!.push(race);
+      }
+      for (const [slotKey, races] of usedSlotsForEmergency) {
+        const baseState = buildAptitudeState(umaData);
+        // スロットを塞がず走れる BC を選ぶ（なければ走れる BC を選ぶ）
+        const emergencyBC =
+          allBCFinalRaces.find(
+            (bc) =>
+              isRaceRunnable(bc, baseState) &&
+              !(BC_MANDATORY[bc.race_name] ?? []).some(([g, , m, h]) => slotKey === sk(g, m, h)),
+          ) ?? allBCFinalRaces.find((bc) => isRaceRunnable(bc, baseState));
+        for (const race of races) {
+          const eg = new Map<string, RaceRow>();
+          if (emergencyBC) {
+            eg.set(bcFinalKey, emergencyBC);
+            for (const [grade, raceName, month, half] of BC_MANDATORY[emergencyBC.race_name] ?? []) {
+              const k = sk(grade, month, half);
+              if (k === slotKey) continue; // 対象スロットは上書きしない
+              const r = allBCMandatoryRaces.find((mr) => mr.race_name === raceName);
+              if (r) eg.set(k, r);
+            }
+          }
+          eg.set(slotKey, race);
+          grid.push(eg);
+          const strategy = emergencyBC ? calcBCStrategy(emergencyBC, umaData) : null;
+          patternStrategies.push(strategy);
+          aptitudeStates.push(
+            strategy ? applyStrategyToAptitude(buildAptitudeState(umaData), strategy) : baseState,
+          );
+        }
+      }
+      this.logger.debug({ unassignedCount: unassignedRaces.length }, 'オーバーフロー: 未割り当て緊急パターン追加');
+    }
+
     // フェーズ6: フェーズ4で未設定のパターン（初期適性では走れるBCがなかった場合）を補完する
     for (let i = nBCFromIntermediate; i < N; i++) {
       if (grid[i].has(bcFinalKey)) continue;
@@ -438,6 +490,7 @@ export class BCPatternBuilderService {
       patternStrategies[i] = calcBCStrategy(runnable, umaData);
       for (const [grade, raceName, month, half] of BC_MANDATORY[runnable.race_name] ?? []) {
         const slotK = sk(grade, month, half);
+        if (grid[i].has(slotK)) continue; // フェーズ5で割り当て済みのスロットは上書きしない
         const race = allBCMandatoryRaces.find((r) => r.race_name === raceName);
         if (race) grid[i].set(slotK, race);
       }
