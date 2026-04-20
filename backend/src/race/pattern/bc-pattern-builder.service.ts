@@ -352,8 +352,9 @@ export class BCPatternBuilderService {
     });
 
     // BC 最終・中間レースをグリッドに設定し、因子戦略・適性を更新
-    // sortedBCRacesForAssign は assignRacesToBCGrids に渡す（nBCFromIntermediate 個のみ。超過インデックスは undefined）
     const sortedBCRacesForAssign: (RaceRow | undefined)[] = [];
+
+    // 先頭 nBCFromIntermediate 個: 残中間レースから逆引きした BC 最終レースを設定
     for (let i = 0; i < nBCFromIntermediate; i++) {
       const bcFinalName = sortedBCFinalNames[i];
       const bcRace = allBCFinalRaces.find((r) => r.race_name === bcFinalName);
@@ -376,7 +377,56 @@ export class BCPatternBuilderService {
         aptitudeStates[i] = applyStrategyToAptitude(buildAptitudeState(umaData), strategy);
       }
     }
-    // 残りパターン（index >= nBCFromIntermediate）: 因子戦略 null・初期適性状態（初期化済み）
+
+    // 残りパターン（index >= nBCFromIntermediate）: 初期適性で BC 最終を仮決定し中間レースを先置き
+    // assignRacesToBCGrids より前に設定することで中間レーススロットへの残レース混入を防ぐ
+
+    // 残レースのうち有効スロットが1つしかないレース（BC制限スロット除外後）のスロットキーを収集
+    // BC中間レースがそのスロットを塞ぐBCを選ばないようにするため
+    const singleSlotKeys = new Set(
+      racesToAssign.flatMap((r) => {
+        const usableSlots = getAvailableSlots(r).filter(
+          (s) => !isBCRestrictedSlot(s.grade, s.month, s.half),
+        );
+        if (usableSlots.length !== 1) return [];
+        const [s] = usableSlots;
+        return [sk(s.grade, s.month, s.half)];
+      }),
+    );
+
+    const usedBCFinalNames = new Set(sortedBCFinalNames);
+    for (let i = nBCFromIntermediate; i < N; i++) {
+      // シングルスロット競合なし・走れるBCを優先、なければ通常のfallback
+      const runnable =
+        allBCFinalRaces.find(
+          (bc) =>
+            !usedBCFinalNames.has(bc.race_name) &&
+            isRaceRunnable(bc, aptitudeStates[i]) &&
+            !(BC_MANDATORY[bc.race_name] ?? []).some(([g, , m, h]) => singleSlotKeys.has(sk(g, m, h))),
+        ) ??
+        allBCFinalRaces.find(
+          (bc) => !usedBCFinalNames.has(bc.race_name) && isRaceRunnable(bc, aptitudeStates[i]),
+        );
+      sortedBCRacesForAssign.push(runnable);
+      if (!runnable) continue;
+
+      usedBCFinalNames.add(runnable.race_name);
+      grid[i].set(bcFinalKey, runnable);
+      for (const [grade, raceName, month, half] of BC_MANDATORY[runnable.race_name] ?? []) {
+        const slotK = sk(grade, month, half);
+        if (grid[i].has(slotK)) continue;
+        const race = allBCMandatoryRaces.find((r) => r.race_name === raceName);
+        if (race) grid[i].set(slotK, race);
+      }
+      const mandatory = (BC_MANDATORY[runnable.race_name] ?? [])
+        .map(([, name]) => allBCMandatoryRaces.find((r) => r.race_name === name))
+        .filter((r): r is RaceRow => r !== undefined);
+      const strategy = calcBCStrategy(runnable, umaData, mandatory);
+      patternStrategies[i] = strategy;
+      if (strategy) {
+        aptitudeStates[i] = applyStrategyToAptitude(buildAptitudeState(umaData), strategy);
+      }
+    }
 
     // フェーズ5: assignRacesToBCGrids で全パターンへ残レースを一括割り当て
     // 既にレースが設定されているスロット（BC 最終・中間）は grid[pi].has(slotK) で自動スキップされる
@@ -384,19 +434,86 @@ export class BCPatternBuilderService {
       N, sortedBCRacesForAssign, grid, patternStrategies, aptitudeStates, racesToAssign, umaData,
     );
 
-    // フェーズ6: BC シナリオ未設定パターンに現在の適性状態で走れる BC シナリオを設定する
+    // フェーズ5後: 連続出走制約などで割り当てられなかったレースに追加パターンを生成する
+    // スロット圧力計算は連続出走制約を考慮できないため、未割り当て残レースを緊急パターンとして追加する
+    const assignedInPhase5 = new Set<number>();
+    for (const g of grid) for (const r of g.values()) assignedInPhase5.add(r.race_id);
+    const unassignedRaces = racesToAssign.filter((r) => !assignedInPhase5.has(r.race_id));
+    if (unassignedRaces.length > 0) {
+      // 未割り当てレースをスロット単位にグループ化し、スロットを塞がない BC でパターンを追加する
+      const usedSlotsForEmergency = new Map<string, RaceRow[]>();
+      for (const race of unassignedRaces) {
+        const usable = getAvailableSlots(race).filter((s) => !isBCRestrictedSlot(s.grade, s.month, s.half));
+        if (usable.length === 0) continue;
+        const key = sk(usable[0].grade, usable[0].month, usable[0].half);
+        if (!usedSlotsForEmergency.has(key)) usedSlotsForEmergency.set(key, []);
+        usedSlotsForEmergency.get(key)!.push(race);
+      }
+      for (const [slotKey, races] of usedSlotsForEmergency) {
+        const baseState = buildAptitudeState(umaData);
+        // スロットを塞がず走れる BC を選ぶ（なければ走れる BC を選ぶ）
+        const emergencyBC =
+          allBCFinalRaces.find(
+            (bc) =>
+              isRaceRunnable(bc, baseState) &&
+              !(BC_MANDATORY[bc.race_name] ?? []).some(([g, , m, h]) => slotKey === sk(g, m, h)),
+          ) ?? allBCFinalRaces.find((bc) => isRaceRunnable(bc, baseState));
+        for (const race of races) {
+          const eg = new Map<string, RaceRow>();
+          if (emergencyBC) {
+            eg.set(bcFinalKey, emergencyBC);
+            for (const [grade, raceName, month, half] of BC_MANDATORY[emergencyBC.race_name] ?? []) {
+              const k = sk(grade, month, half);
+              if (k === slotKey) continue; // 対象スロットは上書きしない
+              const r = allBCMandatoryRaces.find((mr) => mr.race_name === raceName);
+              if (r) eg.set(k, r);
+            }
+          }
+          eg.set(slotKey, race);
+          grid.push(eg);
+          const strategy = emergencyBC ? calcBCStrategy(emergencyBC, umaData) : null;
+          patternStrategies.push(strategy);
+          aptitudeStates.push(
+            strategy ? applyStrategyToAptitude(buildAptitudeState(umaData), strategy) : baseState,
+          );
+        }
+      }
+      this.logger.debug({ unassignedCount: unassignedRaces.length }, 'オーバーフロー: 未割り当て緊急パターン追加');
+    }
+
+    // フェーズ6: フェーズ4で未設定のパターン（初期適性では走れるBCがなかった場合）を補完する
     for (let i = nBCFromIntermediate; i < N; i++) {
+      if (grid[i].has(bcFinalKey)) continue;
       const runnable = allBCFinalRaces.find((bc) => isRaceRunnable(bc, aptitudeStates[i]));
-      if (runnable) {
-        grid[i].set(bcFinalKey, runnable);
-        patternStrategies[i] = calcBCStrategy(runnable, umaData);
+      if (!runnable) continue;
+      grid[i].set(bcFinalKey, runnable);
+      patternStrategies[i] = calcBCStrategy(runnable, umaData);
+      for (const [grade, raceName, month, half] of BC_MANDATORY[runnable.race_name] ?? []) {
+        const slotK = sk(grade, month, half);
+        if (grid[i].has(slotK)) continue; // フェーズ5で割り当て済みのスロットは上書きしない
+        const race = allBCMandatoryRaces.find((r) => r.race_name === raceName);
+        if (race) grid[i].set(slotK, race);
       }
     }
 
-    return grid.map((g, i) => ({
-      grid: g,
-      strategy: patternStrategies[i],
-      aptState: aptitudeStates[i],
-    }));
+    // BC最終・中間レース以外の残レースが1件も割り当たらなかったパターンは除外する
+    // allBCMandatoryRaces はテスト環境では全レースが返る場合があるため、
+    // BC_MANDATORY 定数に定義された名前のみで ID セットを構築する
+    const bcMandatoryNames = new Set(
+      Object.values(BC_MANDATORY).flat().map(([, name]) => name),
+    );
+    const bcMandatoryIdSet = new Set(
+      allBCMandatoryRaces.filter((r) => bcMandatoryNames.has(r.race_name)).map((r) => r.race_id),
+    );
+    const bcFinalIdSet = new Set(allBCFinalRaces.map((r) => r.race_id));
+
+    return grid
+      .map((g, i) => ({ grid: g, strategy: patternStrategies[i], aptState: aptitudeStates[i] }))
+      .filter(({ grid: g }) => {
+        for (const race of g.values()) {
+          if (!bcMandatoryIdSet.has(race.race_id) && !bcFinalIdSet.has(race.race_id)) return true;
+        }
+        return false;
+      });
   }
 }
