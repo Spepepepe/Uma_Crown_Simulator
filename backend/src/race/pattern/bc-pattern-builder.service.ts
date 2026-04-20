@@ -444,7 +444,14 @@ export class BCPatternBuilderService {
     }
 
     // BC最終・中間レース以外の残レースが1件も割り当たらなかったパターンは除外する
-    const bcMandatoryIdSet = new Set(allBCMandatoryRaces.map((r) => r.race_id));
+    // allBCMandatoryRaces はテスト環境では全レースが返る場合があるため、
+    // BC_MANDATORY 定数に定義された名前のみで ID セットを構築する
+    const bcMandatoryNames = new Set(
+      Object.values(BC_MANDATORY).flat().map(([, name]) => name),
+    );
+    const bcMandatoryIdSet = new Set(
+      allBCMandatoryRaces.filter((r) => bcMandatoryNames.has(r.race_name)).map((r) => r.race_id),
+    );
     const bcFinalIdSet = new Set(allBCFinalRaces.map((r) => r.race_id));
 
     return grid
