@@ -1714,5 +1714,18 @@
         "mile_aptitude": "B",
         "classic_aptitude": "A",
         "long_distance_aptitude": "B"
+    },
+    "エピファネイア": {
+        "umamusume_name": "エピファネイア",
+        "turf_aptitude": "A",
+        "dirt_aptitude": "G",
+        "front_runner_aptitude": "D",
+        "early_foot_aptitude": "A",
+        "midfield_aptitude": "B",
+        "closer_aptitude": "G",
+        "sprint_aptitude": "G",
+        "mile_aptitude": "E",
+        "classic_aptitude": "A",
+        "long_distance_aptitude": "A"
     }
 }
